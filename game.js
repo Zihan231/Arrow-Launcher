@@ -302,6 +302,23 @@
     return false;
   }
 
+  function collisionTravelDistance(moving, obstacles) {
+    const direction = moving.direction;
+    const endpoint = moving.points[moving.points.length - 1];
+    const head = { x: endpoint.x + direction.x * 6.5, y: endpoint.y + direction.y * 6.5 };
+    const clearance = save.contrast ? 6.4 : 5.4;
+    let nearest = Infinity;
+    for (const obstacle of obstacles) {
+      const samples = obstacle._samples || (obstacle._samples = samplesFor(obstacle.points));
+      for (const sample of samples) {
+        const perpendicular = direction.x ? Math.abs(sample.y - head.y) : Math.abs(sample.x - head.x);
+        const ahead = direction.x ? (sample.x - head.x) * direction.x : (sample.y - head.y) * direction.y;
+        if (perpendicular < clearance && ahead > 0) nearest = Math.min(nearest, ahead);
+      }
+    }
+    return Number.isFinite(nearest) ? Math.max(.5, nearest - 1.7) : Math.max(4, level.gap * .65);
+  }
+
   function blockersFor(arrow, arrows = level.arrows, direction = arrow.direction) {
     return arrows.filter(other =>
       !other.released && other.animation?.type !== 'release' && other !== arrow && blocksMoving(arrow, other, direction)
@@ -502,12 +519,32 @@
     if (arrow.released) return;
     let offset = arrow.offset;
     let displayPoints = arrow.points;
-    if (arrow.animation?.type === 'shake') {
-      const t = Math.min(1, (now - arrow.animation.start) / arrow.animation.duration);
-      const power = (1 - t) * 7;
-      const perpendicular = { x: -arrow.direction.y, y: arrow.direction.x };
-      offset = { x: perpendicular.x * Math.sin(t * Math.PI * 8) * power, y: perpendicular.y * Math.sin(t * Math.PI * 8) * power };
-      if (t >= 1) { arrow.animation = null; arrow.offset = { x: 0, y: 0 }; runningAnimation = false; }
+    if (arrow.animation?.type === 'collision') {
+      const animation = arrow.animation;
+      const elapsed = now - animation.start;
+      let travelled = 0;
+      if (elapsed < animation.outDuration) {
+        const t = Math.max(0, elapsed / animation.outDuration);
+        travelled = animation.travel * (1 - Math.pow(1 - t, 3));
+      } else if (elapsed < animation.outDuration + animation.holdDuration) {
+        registerArrowImpact(arrow, animation);
+        const holdT = (elapsed - animation.outDuration) / animation.holdDuration;
+        travelled = animation.travel - Math.sin(holdT * Math.PI) * Math.min(2, animation.travel * .12);
+      } else {
+        registerArrowImpact(arrow, animation);
+        const returnT = Math.min(1, (elapsed - animation.outDuration - animation.holdDuration) / animation.returnDuration);
+        const easedReturn = returnT * returnT * (3 - 2 * returnT);
+        travelled = animation.travel * (1 - easedReturn);
+      }
+      displayPoints = slicePath(animation.route, travelled, animation.bodyLength + travelled);
+      offset = { x: 0, y: 0 };
+      if (elapsed >= animation.duration) {
+        const outOfLives = lives <= 0;
+        arrow.animation = null;
+        arrow.offset = { x: 0, y: 0 };
+        runningAnimation = false;
+        if (outOfLives) setTimeout(() => { if (state === 'playing') showModal(els.failModal); }, 90);
+      }
     } else if (arrow.animation?.type === 'release') {
       const t = Math.min(1, (now - arrow.animation.start) / arrow.animation.duration);
       const ease = t * t * (3 - 2 * t);
@@ -590,6 +627,28 @@
       born: performance.now(), life: 430 + Math.random() * 220, color, size: 1.4 + Math.random() * 2
     });
   }
+  function spawnImpactParticles(arrow, travel) {
+    const endpoint = arrow.points[arrow.points.length - 1];
+    const tip = {
+      x: endpoint.x + arrow.direction.x * (travel + 6.5),
+      y: endpoint.y + arrow.direction.y * (travel + 6.5)
+    };
+    const perpendicular = { x: -arrow.direction.y, y: arrow.direction.x };
+    const color = level?.isBoss ? '#b17a29' : '#e56c50';
+    for (let i = 0; i < 8; i++) {
+      const spread = (Math.random() - .5) * 2.5;
+      particles.push({
+        x: tip.x,
+        y: tip.y,
+        vx: -arrow.direction.x * (.6 + Math.random() * 1.2) + perpendicular.x * spread,
+        vy: -arrow.direction.y * (.6 + Math.random() * 1.2) + perpendicular.y * spread,
+        born: performance.now(),
+        life: 260 + Math.random() * 180,
+        color,
+        size: 1 + Math.random() * 1.5
+      });
+    }
+  }
   function drawParticles(now) {
     particles = particles.filter(p => now - p.born < p.life);
     for (const p of particles) {
@@ -631,7 +690,7 @@
   }
 
   function canvasPointer(event) {
-    if (state !== 'playing' || !level || lives <= 0 || level.arrows.some(arrow => arrow.animation?.type === 'shake')) return;
+    if (state !== 'playing' || !level || lives <= 0 || level.arrows.some(arrow => arrow.animation?.type === 'collision')) return;
     const rect = els.canvas.getBoundingClientRect();
     const point = {
       x: (event.clientX - rect.left - els.canvas._offsetX) / els.canvas._scale,
@@ -669,13 +728,34 @@
       sound('success'); haptic(11);
     } else {
       runningAnimation = true;
-      lives--; mistakes++; streak = 0;
-      arrow.animation = { type: 'shake', start: performance.now(), duration: 430 };
-      sound(lives ? 'error' : 'fail'); haptic([34, 35, 34]);
-      toast(lives ? 'That path is still tangled' : 'No drops left', 1200);
-      updateHUD();
-      if (!lives) setTimeout(() => { if (state === 'playing') showModal(els.failModal); }, 560);
+      const travel = collisionTravelDistance(arrow, blockers);
+      const bodyLength = polylineLength(arrow.points);
+      const head = arrow.points[arrow.points.length - 1];
+      const routeEnd = {
+        x: head.x + arrow.direction.x * travel,
+        y: head.y + arrow.direction.y * travel
+      };
+      const outDuration = Math.max(180, Math.min(620, 160 + travel * 2.2));
+      const holdDuration = 110;
+      const returnDuration = Math.max(240, Math.min(520, 210 + travel * 1.25));
+      arrow.animation = {
+        type: 'collision', start: performance.now(), travel, bodyLength, route: arrow.points.concat(routeEnd), outDuration, holdDuration, returnDuration,
+        duration: outDuration + holdDuration + returnDuration, impacted: false
+      };
     }
+  }
+
+  function registerArrowImpact(arrow, animation) {
+    if (animation.impacted) return;
+    animation.impacted = true;
+    lives--;
+    mistakes++;
+    streak = 0;
+    spawnImpactParticles(arrow, animation.travel);
+    sound(lives ? 'error' : 'fail');
+    haptic([34, 35, 34]);
+    toast(lives ? 'That path is still tangled' : 'No drops left', 1200);
+    updateHUD();
   }
 
   function finishRelease(arrow) {
@@ -756,7 +836,7 @@
   }
 
   function useHint() {
-    if (state !== 'playing' || level.arrows.some(arrow => arrow.animation?.type === 'shake')) return;
+    if (state !== 'playing' || level.arrows.some(arrow => arrow.animation?.type === 'collision')) return;
     if (level.isBoss && hintsRemaining <= 0) {
       toast('No hints available for this boss', 1700);
       sound('error');
