@@ -446,11 +446,14 @@
     ctx.fillStyle = save.contrast ? '#fbf7ef' : '#f7f1e7';
     ctx.fillRect(0, 0, W, H);
     ctx.save();
-    ctx.fillStyle = 'rgba(72,61,50,.13)';
-    const drift = Math.sin(now / 1800) * .3;
-    for (let y = 18; y < H; y += 18) {
-      for (let x = 18; x < W; x += 18) {
-        ctx.beginPath(); ctx.arc(x + drift, y, .72, 0, TAU); ctx.fill();
+    const gridGap = level?.gap || 18;
+    const gridOriginX = level ? ((level.x0 % gridGap) + gridGap) % gridGap : 18;
+    const gridOriginY = level ? ((level.y0 % gridGap) + gridGap) % gridGap : 18;
+    ctx.fillStyle = save.contrast ? 'rgba(50,43,36,.29)' : 'rgba(72,61,50,.20)';
+    const dotRadius = save.contrast ? 1 : .86;
+    for (let y = gridOriginY; y < H; y += gridGap) {
+      for (let x = gridOriginX; x < W; x += gridGap) {
+        ctx.beginPath(); ctx.arc(x, y, dotRadius, 0, TAU); ctx.fill();
       }
     }
     if (level) {
