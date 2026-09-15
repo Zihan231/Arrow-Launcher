@@ -37,6 +37,7 @@
   let toastTimer = 0;
   let lastFrame = performance.now();
   let audioContext = null;
+  let audioMaster = null;
 
   const themes = [
     { name: 'Terra', ink: ['#4a3427', '#80513b', '#326d68', '#bd624b', '#9b7139'], glow: '#e56c50' },
@@ -543,12 +544,12 @@
         distance, bodyLength, route: arrow.points.concat(routeEnd), lastTrail: 0
       };
       spawnReleaseParticles(arrow);
-      sound('release'); haptic(11);
+      sound('success'); haptic(11);
     } else {
       runningAnimation = true;
       lives--; mistakes++; streak = 0;
       arrow.animation = { type: 'shake', start: performance.now(), duration: 430 };
-      sound('error'); haptic([34, 35, 34]);
+      sound(lives ? 'error' : 'fail'); haptic([34, 35, 34]);
       toast(lives ? 'That path is still tangled' : 'No drops left', 1200);
       updateHUD();
       if (!lives) setTimeout(() => { if (state === 'playing') showModal(els.failModal); }, 560);
@@ -629,17 +630,91 @@
     if (!save.sound) return;
     try {
       audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
-      const ac = audioContext, now = ac.currentTime;
-      const tones = {
-        tap: [[360, .045]], start: [[280, .06], [420, .09]], release: [[510, .05], [720, .08]],
-        error: [[150, .12], [115, .12]], hint: [[620, .06], [820, .1]], complete: [[440, .09], [554, .09], [659, .18]]
-      }[type] || [[350, .05]];
-      let cursor = now;
-      tones.forEach(([freq, length]) => {
+      const ac = audioContext;
+      if (ac.state === 'suspended') ac.resume();
+      if (!audioMaster) {
+        audioMaster = ac.createGain();
+        const compressor = ac.createDynamicsCompressor();
+        audioMaster.gain.value = .9;
+        compressor.threshold.value = -18;
+        compressor.knee.value = 18;
+        compressor.ratio.value = 7;
+        compressor.attack.value = .003;
+        compressor.release.value = .2;
+        audioMaster.connect(compressor).connect(ac.destination);
+      }
+      const cues = {
+        tap: [
+          { from: 350, to: 410, length: .055, volume: .065 }
+        ],
+        start: [
+          { from: 280, to: 360, length: .09, volume: .075, wave: 'triangle' },
+          { from: 440, to: 560, length: .15, volume: .09 }
+        ],
+        success: [
+          { from: 520, to: 790, length: .095, volume: .105, wave: 'triangle' },
+          { from: 840, to: 1180, length: .16, volume: .1 }
+        ],
+        error: [
+          { from: 220, to: 135, length: .16, volume: .12, wave: 'square' },
+          { from: 145, to: 105, length: .15, volume: .09, wave: 'triangle' }
+        ],
+        fail: [
+          { from: 270, to: 155, length: .2, volume: .12, wave: 'sawtooth' },
+          { from: 160, to: 76, length: .36, volume: .13, wave: 'triangle' },
+          { from: 105, to: 58, length: .42, volume: .095, wave: 'sine' }
+        ],
+        hint: [
+          { from: 610, to: 710, length: .08, volume: .075 },
+          { from: 840, to: 980, length: .14, volume: .085 }
+        ],
+        complete: [
+          { from: 523.25, to: 523.25, length: .14, volume: .105, wave: 'triangle', at: 0 },
+          { from: 659.25, to: 659.25, length: .15, volume: .11, wave: 'triangle', at: .11 },
+          { from: 783.99, to: 783.99, length: .17, volume: .115, wave: 'triangle', at: .22 },
+          { from: 1046.5, to: 1046.5, length: .25, volume: .125, wave: 'triangle', at: .33 },
+          { from: 130.81, to: 130.81, length: .64, volume: .06, wave: 'triangle', at: .48 },
+          { from: 523.25, to: 523.25, length: .62, volume: .06, wave: 'sine', at: .48 },
+          { from: 659.25, to: 659.25, length: .62, volume: .062, wave: 'sine', at: .48 },
+          { from: 783.99, to: 783.99, length: .66, volume: .068, wave: 'sine', at: .48 },
+          { from: 1046.5, to: 1046.5, length: .72, volume: .105, wave: 'sine', at: .48 }
+        ]
+      };
+      const noiseCues = {
+        success: { length: .09, volume: .055, frequency: 1900, filter: 'highpass' },
+        error: { length: .1, volume: .07, frequency: 520, filter: 'lowpass' },
+        fail: { length: .22, volume: .085, frequency: 280, filter: 'lowpass' }
+      };
+      const notes = cues[type] || cues.tap;
+      const cueStart = ac.currentTime + .005;
+      let cursor = cueStart;
+      const noiseCue = noiseCues[type];
+      if (noiseCue) {
+        const frameCount = Math.max(1, Math.floor(ac.sampleRate * noiseCue.length));
+        const buffer = ac.createBuffer(1, frameCount, ac.sampleRate);
+        const channel = buffer.getChannelData(0);
+        for (let i = 0; i < frameCount; i++) channel[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / frameCount, 2.2);
+        const source = ac.createBufferSource(), filter = ac.createBiquadFilter(), gain = ac.createGain();
+        source.buffer = buffer;
+        filter.type = noiseCue.filter;
+        filter.frequency.value = noiseCue.frequency;
+        gain.gain.setValueAtTime(noiseCue.volume, cursor);
+        gain.gain.exponentialRampToValueAtTime(.0001, cursor + noiseCue.length);
+        source.connect(filter).connect(gain).connect(audioMaster);
+        source.start(cursor); source.stop(cursor + noiseCue.length + .01);
+      }
+      notes.forEach(note => {
+        const noteStart = note.at === undefined ? cursor : cueStart + note.at;
         const osc = ac.createOscillator(), gain = ac.createGain();
-        osc.type = type === 'error' ? 'triangle' : 'sine'; osc.frequency.setValueAtTime(freq, cursor);
-        gain.gain.setValueAtTime(.0001, cursor); gain.gain.exponentialRampToValueAtTime(.055, cursor + .012); gain.gain.exponentialRampToValueAtTime(.0001, cursor + length);
-        osc.connect(gain).connect(ac.destination); osc.start(cursor); osc.stop(cursor + length + .02); cursor += length * .72;
+        osc.type = note.wave || 'sine';
+        osc.frequency.setValueAtTime(note.from, noteStart);
+        osc.frequency.exponentialRampToValueAtTime(note.to, noteStart + note.length);
+        gain.gain.setValueAtTime(.0001, noteStart);
+        gain.gain.exponentialRampToValueAtTime(note.volume, noteStart + .014);
+        gain.gain.exponentialRampToValueAtTime(.0001, noteStart + note.length);
+        osc.connect(gain).connect(audioMaster);
+        osc.start(noteStart); osc.stop(noteStart + note.length + .025);
+        if (note.at === undefined) cursor += note.length * .64;
       });
     } catch (_) {}
   }
