@@ -438,9 +438,10 @@
   function updateHUD() {
     els.lives.innerHTML = '';
     for (let i = 0; i < 3; i++) {
-      const drop = document.createElement('i');
-      drop.className = `life-drop${i >= lives ? ' lost' : ''}`;
-      els.lives.appendChild(drop);
+      const heart = document.createElement('span');
+      heart.className = `life-heart${i >= lives ? ' lost' : ''}`;
+      heart.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+      els.lives.appendChild(heart);
     }
     els.lives.setAttribute('aria-label', `${lives} ${lives === 1 ? 'life' : 'lives'}`);
     const removed = level ? level.arrows.filter(a => a.released).length : 0;
@@ -926,7 +927,7 @@
     spawnImpactParticles(arrow, animation.travel);
     sound(lives ? 'error' : 'fail');
     haptic([34, 35, 34]);
-    toast(lives ? 'That path is still tangled' : 'No drops left', 1200);
+    toast(lives ? 'That path is still tangled' : 'No lives left', 1200);
     updateHUD();
   }
 

@@ -82,9 +82,11 @@ h1 span { color: var(--coral); font-style: italic; font-weight: 500; }
 .level-copy strong { display: block; margin-top: 2px; font-family: Georgia, serif; font-size: 22px; font-weight: 500; }
 .level-copy b { font-weight: inherit; }
 .status-row { min-height: 53px; padding: 4px 22px 7px; display: grid; grid-template-columns: 78px 1fr 52px; align-items: center; gap: 12px; }
-.lives { display: flex; gap: 5px; }
-.life-drop { width: 19px; height: 23px; transform: rotate(45deg); border-radius: 50% 50% 52% 10%; background: var(--coral); box-shadow: 0 4px 8px rgba(210,81,56,.18); transition: transform .25s, opacity .25s, filter .25s; }
-.life-drop.lost { opacity: .19; filter: grayscale(1); transform: rotate(45deg) scale(.72); }
+.lives { display: flex; align-items: center; gap: 6px; }
+.life-heart { width: 21px; height: 21px; display: inline-flex; align-items: center; justify-content: center; color: var(--coral); transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity .25s ease, filter .25s ease; }
+.life-heart svg { width: 100%; height: 100%; fill: currentColor; stroke: none; filter: drop-shadow(0 2px 5px rgba(210,81,56,.32)); }
+.life-heart.lost { opacity: .2; filter: grayscale(1); transform: scale(.74); }
+.life-heart.lost svg { filter: none; }
 .progress-meta { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 7px; font-weight: 850; letter-spacing: .12em; }
 .progress-meta strong { color: var(--teal); font-size: 9px; }
 .progress-track { height: 4px; margin-top: 6px; overflow: hidden; border-radius: 99px; background: rgba(62,52,43,.1); }
@@ -101,6 +103,8 @@ h1 span { color: var(--coral); font-style: italic; font-weight: 500; }
 .game-screen.boss-level .level-copy > span { color: #a76d1b; }
 .game-screen.boss-level .progress-track i { background: linear-gradient(90deg, #b17a29, #e0b663); }
 .game-screen.boss-level .progress-meta strong { color: #a76d1b; }
+.game-screen.boss-level .life-heart { color: #b17a29; }
+.game-screen.boss-level .life-heart svg { filter: drop-shadow(0 2px 5px rgba(177,122,41,.32)); }
 .board-toast { position: absolute; left: 50%; top: 18px; z-index: 2; opacity: 0; transform: translate(-50%, -8px); padding: 8px 15px; border-radius: 20px; pointer-events: none; color: #fff; background: rgba(39,35,31,.88); font-size: 11px; font-weight: 700; transition: .22s ease; box-shadow: 0 8px 22px rgba(31,25,20,.16); white-space: nowrap; }
 .board-toast.show { opacity: 1; transform: translate(-50%, 0); }
 .game-controls { width: 100%; min-width: 0; overflow: hidden; flex: 0 0 98px; padding: 10px max(18px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); display: grid; grid-template-columns: 58px minmax(0, 1fr) 58px; gap: 9px; align-items: start; }
@@ -289,7 +293,7 @@ h1 span { color: var(--coral); font-style: italic; font-weight: 500; }
   .level-copy span { font-size: 6px; letter-spacing: .1em; }
   .level-copy strong { font-size: 17px; }
   .status-row { padding: 12px 5px; gap: 12px; }
-  .life-drop { width: 14px; height: 17px; }
+  .life-heart { width: 16px; height: 16px; }
   .progress-meta { font-size: 6px; }
   .game-controls { gap: 7px; }
   .control-button { min-height: 43px; padding: 3px; gap: 7px; border-radius: 14px; font-size: 8px; }
