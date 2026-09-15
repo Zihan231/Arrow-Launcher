@@ -16,11 +16,12 @@
     resume: $('#resumeButton'), pauseRestart: $('#pauseRestartButton'), pauseHome: $('#pauseHomeButton'), menuSettings: $('#menuSettingsButton'), settingsClose: $('#settingsClose'),
     next: $('#nextButton'), retry: $('#retryButton'), failHome: $('#failHomeButton'), sound: $('#soundToggle'), haptic: $('#hapticToggle'), contrast: $('#contrastToggle'),
     bossBadge: $('#bossBadge'), resultEyebrow: $('#resultEyebrow'), resultTitle: $('#resultTitle'), nextLabel: $('#nextLabel'),
-    resultScore: $('#resultScore'), resultMoves: $('#resultMoves'), resultMistakes: $('#resultMistakes'), resultStreak: $('#resultStreak'), confetti: $('#confetti')
+    resultScore: $('#resultScore'), resultMoves: $('#resultMoves'), resultMistakes: $('#resultMistakes'), resultStreak: $('#resultStreak'), confetti: $('#confetti'),
+    tutorialModal: $('#tutorialModal'), tutorialStart: $('#tutorialStartButton'), menuHelp: $('#menuHelpButton'), tutorialReplay: $('#tutorialReplayButton')
   };
   const ctx = els.canvas.getContext('2d', { alpha: false });
 
-  const defaults = { level: 1, best: 1, cleared: 0, perfect: 0, bosses: 0, bossPending: false, sound: true, haptics: true, contrast: false, theme: 0 };
+  const defaults = { level: 1, best: 1, cleared: 0, perfect: 0, bosses: 0, bossPending: false, sound: true, haptics: true, contrast: false, theme: 0, seenTutorial: false };
   let save = loadSave();
   let state = 'menu';
   let level = null;
@@ -371,6 +372,84 @@
     );
   }
 
+  function makeTutorialLevel() {
+    const cols = 8, rows = 9, gap = 28;
+    const x0 = W / 2 - (cols - 1) * gap / 2;
+    const y0 = H / 2 - (rows - 1) * gap / 2;
+
+    const arrowDefs = [
+      { id: 'TUT1', grid: [{ c: 3, r: 5 }, { c: 3, r: 2 }, { c: 6, r: 2 }], dir: { x: 1, y: 0 }, colorIndex: 3 },
+      { id: 'TUT2', grid: [{ c: 0, r: 4 }, { c: 2, r: 4 }], dir: { x: 1, y: 0 }, colorIndex: 2 },
+      { id: 'TUT3', grid: [{ c: 0, r: 7 }, { c: 0, r: 5 }], dir: { x: 0, y: -1 }, colorIndex: 1 },
+      { id: 'TUT4', grid: [{ c: 4, r: 6 }, { c: 1, r: 6 }], dir: { x: -1, y: 0 }, colorIndex: 4 }
+    ];
+
+    const arrowObjects = arrowDefs.map((def, i) => {
+      const points = def.grid.map(p => ({ x: x0 + p.c * gap, y: y0 + p.r * gap }));
+      return {
+        id: def.id,
+        points,
+        direction: { ...def.dir },
+        released: false,
+        offset: { x: 0, y: 0 },
+        animation: null,
+        colorIndex: def.colorIndex,
+        order: i
+      };
+    });
+
+    const cells = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        cells.push({ c, r });
+      }
+    }
+
+    return {
+      number: 0,
+      isTutorial: true,
+      isBoss: false,
+      bossNumber: 0,
+      shape: { name: 'PRACTICE ARTWORK', id: 'tutorial' },
+      arrows: arrowObjects,
+      total: arrowObjects.length,
+      gap,
+      cells,
+      x0,
+      y0,
+      cols,
+      rows
+    };
+  }
+
+  function startTutorialLevel() {
+    clearTimeout(completionTimer);
+    completionTimer = 0;
+    completionPending = false;
+    completionCommitted = false;
+    completionPresented = false;
+    closeModal();
+    testingPreview = false;
+    state = 'playing';
+    showScreen(els.game);
+    lives = 3; moves = 0; mistakes = 0; streak = 0; bestStreak = 0; score = 0;
+    hintArrow = null; hintUntil = 0; particles = []; runningAnimation = false;
+    clearHold();
+
+    level = makeTutorialLevel();
+    hintsRemaining = Infinity;
+    els.game.classList.remove('boss-level');
+    els.level.textContent = 'LESSON';
+    els.shape.textContent = 'PRACTICE • 4 MOVES';
+    els.nextLabel.textContent = 'Begin Level 1';
+
+    updateHintButton();
+    updateHUD();
+    resizeCanvas();
+    toast('Tap the free arrow to release it', 2600);
+    sound('start');
+  }
+
   function startGame(levelNumber = save.level, bossMode = save.bossPending, previewMode = false) {
     clearTimeout(completionTimer);
     completionTimer = 0;
@@ -402,7 +481,10 @@
     sound('start');
   }
 
-  function restartLevel() { startGame(level ? level.number : save.level, level ? level.isBoss : save.bossPending, testingPreview); }
+  function restartLevel() {
+    if (level?.isTutorial) return startTutorialLevel();
+    startGame(level ? level.number : save.level, level ? level.isBoss : save.bossPending, testingPreview);
+  }
   function showScreen(screen) {
     [els.menu, els.game].forEach(s => s.classList.toggle('active', s === screen));
   }
@@ -921,13 +1003,15 @@
   function registerArrowImpact(arrow, animation) {
     if (animation.impacted) return;
     animation.impacted = true;
-    lives--;
+    if (!level?.isTutorial) {
+      lives--;
+    }
     mistakes++;
     streak = 0;
     spawnImpactParticles(arrow, animation.travel);
-    sound(lives ? 'error' : 'fail');
+    sound('error');
     haptic([34, 35, 34]);
-    toast(lives ? 'That path is still tangled' : 'No lives left', 1200);
+    toast(level?.isTutorial ? 'Blocked! Try holding to preview' : lives ? 'That path is still tangled' : 'No lives left', 1500);
     updateHUD();
   }
 
@@ -935,6 +1019,9 @@
     if (arrow.released) return;
     arrow.released = true; arrow.animation = null; runningAnimation = false;
     updateHUD();
+    if (level?.isTutorial && !level.arrows.every(a => a.released)) {
+      toast('Great! Find the next loose arrow', 1200);
+    }
     if (level.arrows.every(a => a.released)) {
       runningAnimation = true;
       score += (level.isBoss ? 3000 : 500) + (mistakes === 0 ? (level.isBoss ? 1200 : 500) : 0) + lives * 100;
@@ -945,7 +1032,7 @@
   }
 
   function commitLevelCompletion() {
-    if (completionCommitted || testingPreview) return;
+    if (completionCommitted || testingPreview || level?.isTutorial) return;
     completionCommitted = true;
     save.cleared++;
     if (level.isBoss) {
@@ -978,6 +1065,17 @@
     els.resultMoves.textContent = moves;
     els.resultMistakes.textContent = mistakes;
     els.resultStreak.textContent = bestStreak;
+    if (level.isTutorial) {
+      save.seenTutorial = true;
+      save.level = Math.max(save.level || 1, 1);
+      persist();
+      els.resultEyebrow.textContent = 'LESSON COMPLETE';
+      els.resultTitle.textContent = 'You are ready to untangle.';
+      els.nextLabel.textContent = 'Begin Level 1';
+      makeConfetti(36);
+      showModal(els.successModal);
+      return;
+    }
     els.resultEyebrow.textContent = level.isBoss ? 'BOSS CONQUERED' : 'ARTWORK UNTANGLED';
     els.resultTitle.textContent = level.isBoss ? 'A magnificent victory.' : 'Beautifully done.';
     if (testingPreview) {
@@ -994,13 +1092,17 @@
   function showModal(modal) {
     clearHold();
     pausedAt = performance.now();
-    state = modal === els.settingsModal && els.menu.classList.contains('active') ? 'menu-modal' : 'paused';
-    [els.pauseModal, els.settingsModal, els.successModal, els.failModal].forEach(m => m.classList.toggle('active', m === modal));
+    state = (modal === els.settingsModal || modal === els.tutorialModal) && els.menu.classList.contains('active') ? 'menu-modal' : 'paused';
+    [els.pauseModal, els.settingsModal, els.successModal, els.failModal, els.tutorialModal].forEach(m => {
+      if (m) m.classList.toggle('active', m === modal);
+    });
     els.backdrop.classList.add('show'); els.backdrop.setAttribute('aria-hidden', 'false');
   }
   function closeModal() {
     els.backdrop.classList.remove('show'); els.backdrop.setAttribute('aria-hidden', 'true');
-    [els.pauseModal, els.settingsModal, els.successModal, els.failModal].forEach(m => m.classList.remove('active'));
+    [els.pauseModal, els.settingsModal, els.successModal, els.failModal, els.tutorialModal].forEach(m => {
+      if (m) m.classList.remove('active');
+    });
     if (level && els.game.classList.contains('active')) state = 'playing';
   }
 
@@ -1165,7 +1267,13 @@
     els.app.classList.toggle('high-contrast', save.contrast);
   }
 
-  els.play.addEventListener('click', () => startGame(save.level, save.bossPending));
+  els.play.addEventListener('click', () => {
+    if (!save.seenTutorial) {
+      showModal(els.tutorialModal);
+      return;
+    }
+    startGame(save.level, save.bossPending);
+  });
   els.back.addEventListener('click', showMenu);
   els.pause.addEventListener('click', () => { if (state === 'playing') showModal(els.pauseModal); });
   els.restart.addEventListener('click', restartLevel);
@@ -1176,7 +1284,13 @@
   els.pauseHome.addEventListener('click', showMenu);
   els.retry.addEventListener('click', restartLevel);
   els.failHome.addEventListener('click', showMenu);
-  els.next.addEventListener('click', () => startGame(save.level, save.bossPending));
+  els.next.addEventListener('click', () => {
+    if (level?.isTutorial) {
+      startGame(1, false);
+      return;
+    }
+    startGame(save.level, save.bossPending);
+  });
   els.menuSettings.addEventListener('click', () => showModal(els.settingsModal));
   els.settingsClose.addEventListener('click', () => { closeModal(); state = els.menu.classList.contains('active') ? 'menu' : 'playing'; });
   els.sound.addEventListener('click', () => { save.sound = !save.sound; persist(); updateSettings(); sound('tap'); });
@@ -1213,6 +1327,25 @@
     return { valid: true, arrows: generated.total, removed };
   }
 
+  if (els.tutorialStart) {
+    els.tutorialStart.addEventListener('click', () => {
+      closeModal();
+      startTutorialLevel();
+    });
+  }
+  if (els.menuHelp) {
+    els.menuHelp.addEventListener('click', () => showModal(els.tutorialModal));
+  }
+  if (els.tutorialReplay) {
+    els.tutorialReplay.addEventListener('click', () => {
+      closeModal();
+      showModal(els.tutorialModal);
+    });
+  }
+
   updateSettings(); updateMenu(); resizeCanvas(); requestAnimationFrame(frame);
+  if (!save.seenTutorial) {
+    setTimeout(() => showModal(els.tutorialModal), 120);
+  }
   window.ArrowLauncher = { makeLevel, validateGenerated, blockersFor, restart: restartLevel, get state() { return { level, lives, moves, mistakes }; } };
 })();
