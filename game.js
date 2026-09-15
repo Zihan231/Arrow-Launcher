@@ -123,9 +123,9 @@
   function makeLevel(levelNumber, generationSalt = 0) {
     const random = mulberry32((levelNumber * 9277 + 43103 + generationSalt * 7919) >>> 0);
     const shape = silhouettes[(levelNumber - 1) % silhouettes.length];
-    const cols = levelNumber < 12 ? 13 : levelNumber < 45 ? 15 : 17;
-    const rows = levelNumber < 12 ? 18 : levelNumber < 45 ? 20 : 22;
-    const gap = Math.min(19, 288 / (cols - 1), 382 / (rows - 1));
+    const cols = levelNumber < 12 ? 17 : levelNumber < 45 ? 19 : 21;
+    const rows = levelNumber < 12 ? 23 : levelNumber < 45 ? 25 : 27;
+    const gap = Math.min(14.5, 280 / (cols - 1), 372 / (rows - 1));
     const x0 = W / 2 - (cols - 1) * gap / 2;
     const y0 = H / 2 - (rows - 1) * gap / 2 - 5;
     const cells = [];
@@ -164,7 +164,7 @@
     const paths = [];
     let covered = 0;
     const desiredCoverage = levelNumber < 10 ? .7 : levelNumber < 35 ? .76 : .82;
-    const maxPaths = Math.min(36, target + 11);
+    const maxPaths = Math.min(40, target + 14);
     const maxLen = Math.min(10, 6 + Math.floor(levelNumber / 28));
     let safety = 0;
     while ((paths.length < target || covered < cells.length * desiredCoverage) && paths.length < maxPaths && available.size > 2 && safety++ < 1100) {
@@ -223,10 +223,10 @@
 
   function blocksMoving(moving, obstacle, direction) {
     const bSamples = obstacle._samples || (obstacle._samples = samplesFor(obstacle.points));
-    const clearance = save.contrast ? 8.5 : 7.25;
+    const clearance = save.contrast ? 6.4 : 5.4;
     const endpoint = moving.points[moving.points.length - 1];
     // Only the arrowhead's forward ray determines whether an arrow can leave.
-    const head = { x: endpoint.x + direction.x * 8.5, y: endpoint.y + direction.y * 8.5 };
+    const head = { x: endpoint.x + direction.x * 6.5, y: endpoint.y + direction.y * 6.5 };
     for (const b of bSamples) {
       const perpendicular = direction.x ? Math.abs(b.y - head.y) : Math.abs(b.x - head.x);
       const ahead = direction.x ? (b.x - head.x) * direction.x : (b.y - head.y) * direction.y;
@@ -251,19 +251,14 @@
           const oriented = reversed ? arrow.points.slice().reverse() : arrow.points.slice();
           const last = oriented[oriented.length - 1];
           const previous = oriented[oriented.length - 2];
-          const incoming = { x: Math.sign(last.x - previous.x), y: Math.sign(last.y - previous.y) };
-          for (const direction of shuffle(dirs.slice(), random)) {
-            // Continue forward or make a crisp 90-degree final turn; never double back.
-            if (incoming.x * direction.x + incoming.y * direction.y < 0) continue;
-            const lead = { x: last.x + direction.x * 6, y: last.y + direction.y * 6 };
-            const candidatePoints = oriented.concat(lead);
-            const candidate = { points: candidatePoints };
-            const ownBody = { points: oriented.slice(0, -1) };
-            // Reject heads aimed through another part of their own routed line.
-            if (blocksMoving(candidate, ownBody, direction)) continue;
-            if (!remaining.some(other => other !== arrow && blocksMoving(candidate, other, direction))) {
-              safeOptions.push({ arrow, direction, points: candidatePoints });
-            }
+          const direction = { x: Math.sign(last.x - previous.x), y: Math.sign(last.y - previous.y) };
+          const candidate = { points: oriented };
+          const ownBody = { points: oriented.slice(0, -1) };
+          // The head follows the real final segment, so it is never separated
+          // from the body by a tiny artificial elbow.
+          if (blocksMoving(candidate, ownBody, direction)) continue;
+          if (!remaining.some(other => other !== arrow && blocksMoving(candidate, other, direction))) {
+            safeOptions.push({ arrow, direction, points: oriented });
           }
         }
       }
@@ -420,23 +415,23 @@
     ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; ctx.miterLimit = 2;
     if (highlighted) {
       ctx.shadowColor = theme.glow; ctx.shadowBlur = 8 + Math.sin(now / 110) * 3;
-      ctx.strokeStyle = theme.glow; ctx.lineWidth = 8;
+      ctx.strokeStyle = theme.glow; ctx.lineWidth = 6.5;
       ctx.globalAlpha = .2;
       routedPath(displayPoints, offset); ctx.stroke();
       ctx.globalAlpha = 1;
     }
     ctx.shadowColor = 'rgba(40,29,20,.13)'; ctx.shadowBlur = 1.5; ctx.shadowOffsetY = 1;
-    ctx.strokeStyle = color; ctx.lineWidth = save.contrast ? 4.5 : 3.6;
+    ctx.strokeStyle = color; ctx.lineWidth = save.contrast ? 3.5 : 2.75;
     routedPath(displayPoints, offset); ctx.stroke();
 
     const tipPoint = displayPoints[displayPoints.length - 1];
-    const tip = { x: tipPoint.x + offset.x + arrow.direction.x * 8.5, y: tipPoint.y + offset.y + arrow.direction.y * 8.5 };
-    const back = { x: tip.x - arrow.direction.x * 11, y: tip.y - arrow.direction.y * 11 };
+    const tip = { x: tipPoint.x + offset.x + arrow.direction.x * 6.5, y: tipPoint.y + offset.y + arrow.direction.y * 6.5 };
+    const back = { x: tip.x - arrow.direction.x * 8.5, y: tip.y - arrow.direction.y * 8.5 };
     const perp = { x: -arrow.direction.y, y: arrow.direction.x };
     ctx.beginPath();
     ctx.moveTo(tip.x, tip.y);
-    ctx.lineTo(back.x + perp.x * 5.2, back.y + perp.y * 5.2);
-    ctx.lineTo(back.x - perp.x * 5.2, back.y - perp.y * 5.2);
+    ctx.lineTo(back.x + perp.x * 3.25, back.y + perp.y * 3.25);
+    ctx.lineTo(back.x - perp.x * 3.25, back.y - perp.y * 3.25);
     ctx.closePath();
     ctx.fillStyle = color; ctx.fill();
     ctx.restore();
