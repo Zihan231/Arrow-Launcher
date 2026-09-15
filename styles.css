@@ -14,7 +14,7 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+html, body { width: 100%; height: 100%; min-height: 100%; margin: 0; overflow: hidden; }
 body {
   font-family: Inter, ui-rounded, "SF Pro Rounded", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--ink);
@@ -23,7 +23,7 @@ body {
 }
 button { font: inherit; color: inherit; border: 0; cursor: pointer; touch-action: manipulation; }
 button:focus-visible { outline: 3px solid rgba(229,108,80,.42); outline-offset: 3px; }
-.app { width: 100%; height: 100%; position: relative; overflow: hidden; background: var(--paper); }
+.app { width: 100%; height: 100%; height: 100dvh; position: relative; overflow: hidden; background: var(--paper); }
 .screen { position: absolute; inset: 0; display: none; overflow: hidden; }
 .screen.active { display: flex; }
 
@@ -149,10 +149,175 @@ h1 span { color: var(--coral); font-style: italic; font-weight: 500; }
 @keyframes modal-in { from { opacity: 0; transform: translateY(18px) scale(.96); } }
 @keyframes confetti-fall { to { transform: translate(var(--drift), 460px) rotate(620deg); opacity: 0; } }
 @keyframes boss-spark { 50% { transform: scale(1.3) rotate(18deg); filter: brightness(1.2); } }
-@media (min-width: 700px) {
-  .app { width: 430px; height: min(900px, calc(100vh - 30px)); margin: 15px auto; border-radius: 38px; box-shadow: 0 30px 100px rgba(0,0,0,.45); }
-}
 @media (max-height: 680px) {
   .brand-lockup { margin-bottom: 2vh; }.logo-mark { width: 72px; height: 72px; }.tagline { margin-top: 18px; }.menu-stats { margin-top: 13px; }.game-controls { flex-basis: 82px; }
+}
+
+/* Tablet portrait: use the extra room without turning the interface into a
+   stretched phone mockup. The board remains centered and undistorted. */
+@media (min-width: 700px) and (orientation: portrait) {
+  body { background: radial-gradient(circle at 50% 15%, #413a33, #171513 68%); }
+  .app { width: min(100%, 820px); margin-inline: auto; box-shadow: 0 0 90px rgba(0,0,0,.24); }
+  .menu-screen { padding-inline: clamp(44px, 9vw, 86px); }
+  .brand-lockup { margin-bottom: 5vh; }
+  .logo-mark { width: 132px; height: 132px; }
+  h1 { font-size: clamp(76px, 12vw, 104px); }
+  .tagline { font-size: 18px; }
+  .menu-actions { max-width: 540px; }
+  .primary-button { min-height: 86px; }
+  .menu-footer { font-size: 11px; }
+  .game-header, .status-row, .game-controls { width: min(100%, 680px); margin-inline: auto; }
+  .canvas-shell { width: min(calc(100% - 40px), 720px, calc(72dvh - 145px)); margin-inline: auto; }
+  .game-controls { grid-template-columns: 72px minmax(260px, 1fr) 72px; gap: 16px; }
+  .control-button { width: 72px; }
+  .level-copy span { font-size: 9px; }
+  .level-copy strong { font-size: 25px; }
+}
+
+/* Desktop and landscape devices use the full display: information lives on
+   the left, the artwork stays central, and controls form a right tool rail. */
+@media (min-width: 900px), (orientation: landscape) and (min-width: 560px) and (max-height: 700px) {
+  body {
+    background:
+      radial-gradient(circle at 18% 12%, rgba(229,108,80,.17), transparent 30%),
+      radial-gradient(circle at 82% 86%, rgba(63,130,123,.14), transparent 34%),
+      #1d1a17;
+  }
+  .app { max-width: none; margin: 0; border-radius: 0; box-shadow: none; }
+
+  .menu-screen.active {
+    display: grid;
+    grid-template-columns: minmax(0, 560px) minmax(300px, 500px);
+    grid-template-rows: 1fr auto;
+    justify-content: center;
+    column-gap: clamp(28px, 4vw, 76px);
+    padding: clamp(24px, 5vw, 76px);
+  }
+  .menu-top { position: absolute; top: clamp(18px, 3vw, 38px); right: clamp(20px, 4vw, 54px); }
+  .brand-lockup { grid-column: 1; grid-row: 1 / 3; align-self: center; margin: 0; text-align: left; }
+  .logo-mark { width: clamp(88px, 9vw, 142px); height: clamp(88px, 9vw, 142px); margin: 0 0 18px; }
+  h1 { font-size: clamp(68px, 8vw, 118px); line-height: .76; }
+  .tagline { font-size: clamp(14px, 1.4vw, 19px); }
+  .menu-actions { grid-column: 2; grid-row: 1; align-self: center; width: 100%; max-width: 500px; margin: 0; }
+  .primary-button { min-height: clamp(72px, 8vh, 88px); }
+  .menu-footer { grid-column: 2; grid-row: 2; width: 100%; max-width: 500px; margin: 0; padding-bottom: 2px; }
+
+  .game-screen.active {
+    display: grid;
+    grid-template-columns: minmax(140px, 260px) minmax(270px, 760px) minmax(140px, 240px);
+    grid-template-rows: auto 1fr;
+    justify-content: center;
+    gap: clamp(10px, 2.2vw, 36px);
+    padding: clamp(12px, 3vw, 34px);
+  }
+  .game-header { grid-column: 1; grid-row: 1; width: 100%; padding: 0; }
+  .status-row {
+    grid-column: 1;
+    grid-row: 2;
+    min-height: 0;
+    padding: clamp(22px, 5vh, 52px) 10px;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    align-content: start;
+    gap: clamp(20px, 4vh, 38px);
+  }
+  .lives { justify-content: center; }
+  .progress-wrap { width: 100%; }
+  .progress-track { height: 6px; }
+  .streak { justify-self: center; }
+  .canvas-shell {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: center;
+    justify-self: center;
+    flex: none;
+    width: min(100%, calc(72dvh - 24px));
+    height: auto;
+    aspect-ratio: 360 / 500;
+    margin: 0;
+    border-radius: clamp(22px, 2.5vw, 34px);
+    box-shadow: inset 0 1px rgba(255,255,255,.76), 0 24px 70px rgba(36,29,22,.13);
+  }
+  .game-controls {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+    width: 100%;
+    padding: 0;
+    overflow: visible;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .control-button {
+    width: 100%;
+    min-height: 58px;
+    padding: 6px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 11px;
+    border-radius: 20px;
+    background: rgba(255,255,255,.38);
+    border: 1px solid rgba(72,59,46,.07);
+    font-size: 10px;
+  }
+  .control-button span { flex: 0 0 46px; }
+  .hint-button { min-height: 64px; height: auto; padding: 10px 13px; justify-content: flex-start; }
+  .hint-button strong { font-size: 12px; }
+  .hint-button small { font-size: 9px; }
+  .modal { width: min(420px, calc(100% - 40px)); }
+}
+
+/* Compact landscape phones need the same wide composition with smaller rails. */
+@media (orientation: landscape) and (min-width: 560px) and (max-height: 500px) {
+  .menu-screen.active { padding: 14px 28px; column-gap: 38px; }
+  .menu-top { top: 10px; right: 16px; }
+  .logo-mark { display: none; }
+  .eyebrow { margin-bottom: 5px; font-size: 8px; }
+  h1 { font-size: clamp(48px, 10vw, 70px); }
+  .tagline { margin-top: 14px; font-size: 12px; }
+  .primary-button { min-height: 62px; border-radius: 20px; }
+  .menu-stats { margin-top: 12px; }
+  .menu-footer { display: none; }
+
+  .game-screen.active {
+    grid-template-columns: minmax(116px, 150px) minmax(220px, 1fr) minmax(116px, 150px);
+    gap: 8px;
+    padding: 8px max(8px, env(safe-area-inset-right)) 8px max(8px, env(safe-area-inset-left));
+  }
+  .game-header { grid-template-columns: 34px 1fr 34px; }
+  .icon-button { width: 34px; height: 34px; padding: 8px; }
+  .level-copy span { font-size: 6px; letter-spacing: .1em; }
+  .level-copy strong { font-size: 17px; }
+  .status-row { padding: 12px 5px; gap: 12px; }
+  .life-drop { width: 14px; height: 17px; }
+  .progress-meta { font-size: 6px; }
+  .game-controls { gap: 7px; }
+  .control-button { min-height: 43px; padding: 3px; gap: 7px; border-radius: 14px; font-size: 8px; }
+  .control-button span { width: 35px; height: 35px; flex-basis: 35px; padding: 9px; border-radius: 12px; }
+  .hint-button { min-height: 48px; padding: 6px 8px; border-radius: 15px; }
+  .hint-icon { width: 32px; height: 32px; padding: 7px; }
+  .hint-button strong { font-size: 9px; }
+  .hint-button small { font-size: 7px; }
+  .boss-badge { right: 9px; top: 9px; }
+  .test-next-button { left: 9px; top: 9px; }
+  .board-toast { top: 45px; padding: 6px 11px; font-size: 9px; }
+}
+
+@media (min-width: 1500px) and (min-height: 850px) {
+  .game-screen.active { grid-template-columns: 280px minmax(520px, 780px) 260px; }
+  .game-header { padding-top: 10px; }
+  .level-copy span { font-size: 10px; }
+  .level-copy strong { font-size: 28px; }
+  .status-row { padding-inline: 22px; }
+  .game-controls { gap: 18px; }
+}
+
+@media (max-width: 360px) {
+  .menu-screen { padding-inline: 16px; }
+  .status-row { padding-inline: 14px; grid-template-columns: 70px 1fr 47px; gap: 8px; }
+  .canvas-shell { margin-inline: 8px; border-radius: 23px; }
+  .game-controls { padding-inline: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }

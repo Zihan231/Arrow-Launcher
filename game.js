@@ -204,7 +204,7 @@
     let covered = 0;
     const desiredCoverage = isBoss ? Math.min(.98, .93 + bossNumber * .005) : Math.min(.95, .76 + levelNumber * .004);
     const maxPaths = isBoss ? Math.min(80, target + 4) : Math.min(68, target + 6);
-    const maxLen = isBoss ? Math.min(20, 14 + Math.floor(bossNumber / 2)) : Math.min(16, 7 + Math.floor(levelNumber / 6));
+    const maxLen = isBoss ? Math.min(45, 14 + Math.floor(bossNumber / 2)) : Math.min(30, 7 + Math.floor(levelNumber / 6));
     const minLen = isBoss ? 6 : Math.min(7, 3 + Math.floor(levelNumber / 12));
     const turnBias = isBoss ? 1 : Math.min(1, .55 + levelNumber * .015);
     let safety = 0;
@@ -424,13 +424,19 @@
     const dpr = Math.min(2.5, window.devicePixelRatio || 1);
     els.canvas.width = Math.max(1, Math.round(rect.width * dpr));
     els.canvas.height = Math.max(1, Math.round(rect.height * dpr));
-    els.canvas._scaleX = rect.width / W;
-    els.canvas._scaleY = rect.height / H;
+    const scale = Math.min(rect.width / W, rect.height / H);
+    els.canvas._scale = scale || 1;
+    els.canvas._offsetX = Math.max(0, (rect.width - W * els.canvas._scale) / 2);
+    els.canvas._offsetY = Math.max(0, (rect.height - H * els.canvas._scale) / 2);
     els.canvas._dpr = dpr;
   }
 
   function setupContext() {
-    ctx.setTransform(els.canvas._dpr * els.canvas._scaleX, 0, 0, els.canvas._dpr * els.canvas._scaleY, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = save.contrast ? '#fbf7ef' : '#f7f1e7';
+    ctx.fillRect(0, 0, els.canvas.width, els.canvas.height);
+    const scale = els.canvas._dpr * els.canvas._scale;
+    ctx.setTransform(scale, 0, 0, scale, els.canvas._dpr * els.canvas._offsetX, els.canvas._dpr * els.canvas._offsetY);
   }
 
   function routedPath(points, offset = { x: 0, y: 0 }) {
@@ -611,7 +617,11 @@
   function canvasPointer(event) {
     if (state !== 'playing' || !level || lives <= 0 || level.arrows.some(arrow => arrow.animation?.type === 'shake')) return;
     const rect = els.canvas.getBoundingClientRect();
-    const point = { x: (event.clientX - rect.left) / rect.width * W, y: (event.clientY - rect.top) / rect.height * H };
+    const point = {
+      x: (event.clientX - rect.left - els.canvas._offsetX) / els.canvas._scale,
+      y: (event.clientY - rect.top - els.canvas._offsetY) / els.canvas._scale
+    };
+    if (point.x < 0 || point.x > W || point.y < 0 || point.y > H) return;
     const arrow = hitArrow(point);
     if (!arrow) return;
     event.preventDefault();
@@ -891,6 +901,7 @@
   els.contrast.addEventListener('click', () => { save.contrast = !save.contrast; persist(); updateSettings(); });
   els.canvas.addEventListener('pointerdown', canvasPointer, { passive: false });
   window.addEventListener('resize', resizeCanvas);
+  if ('ResizeObserver' in window) new ResizeObserver(resizeCanvas).observe(els.shell);
   document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') showModal(els.pauseModal); });
   window.addEventListener('keydown', event => {
     if (event.key === 'Escape') {
