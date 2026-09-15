@@ -10,7 +10,7 @@
   const els = {
     app: $('#app'), menu: $('#menuScreen'), game: $('#gameScreen'), canvas: $('#gameCanvas'), shell: $('#canvasShell'),
     play: $('#playButton'), playLabel: $('#playLabel'), menuLevel: $('#menuLevel'), best: $('#bestLevel'), cleared: $('#clearedCount'), perfect: $('#perfectCount'),
-    back: $('#backButton'), pause: $('#pauseButton'), restart: $('#restartButton'), hint: $('#hintButton'), theme: $('#themeButton'),
+    back: $('#backButton'), pause: $('#pauseButton'), restart: $('#restartButton'), hint: $('#hintButton'), hintTitle: $('#hintTitle'), hintDetail: $('#hintDetail'), theme: $('#themeButton'),
     level: $('#levelNumber'), shape: $('#shapeLabel'), lives: $('#lives'), progress: $('#progressFill'), progressText: $('#progressText'), streak: $('#streakCount'), toast: $('#boardToast'),
     backdrop: $('#modalBackdrop'), pauseModal: $('#pauseModal'), settingsModal: $('#settingsModal'), successModal: $('#successModal'), failModal: $('#failModal'),
     resume: $('#resumeButton'), pauseRestart: $('#pauseRestartButton'), pauseHome: $('#pauseHomeButton'), menuSettings: $('#menuSettingsButton'), settingsClose: $('#settingsClose'),
@@ -40,6 +40,7 @@
   let audioContext = null;
   let audioMaster = null;
   let testingPreview = false;
+  let hintsRemaining = Infinity;
 
   const themes = [
     { name: 'Terra', ink: ['#4a3427', '#80513b', '#326d68', '#bd624b', '#9b7139'], glow: '#e56c50' },
@@ -156,7 +157,7 @@
     const bossNumber = isBoss ? levelNumber / 10 : 0;
     const shape = isBoss ? bossSilhouettes[(bossNumber - 1) % bossSilhouettes.length] : silhouettes[(levelNumber - 1) % silhouettes.length];
     const normalGrowth = Math.min(4, Math.floor((levelNumber - 1) / 10));
-    const bossGrowth = isBoss ? Math.min(2, Math.floor((bossNumber - 1) / 3)) : 0;
+    const bossGrowth = isBoss ? Math.min(3, Math.floor((bossNumber - 1) / 3)) : 0;
     const cols = isBoss ? 27 + bossGrowth * 2 : 21 + normalGrowth * 2;
     const rows = isBoss ? 33 + bossGrowth * 2 : 27 + normalGrowth * 2;
     const bossGap = 11.5 - Math.min(1.2, Math.max(0, bossNumber - 1) * .1);
@@ -173,7 +174,7 @@
     }
     const valid = new Set(cells.map(p => key(p.c, p.r)));
     const target = isBoss
-      ? Math.min(72, 56 + bossNumber * 2)
+      ? Math.min(76, 56 + bossNumber * 2)
       : Math.min(64, 24 + Math.floor(levelNumber * .8));
     let paths = [];
     for (let attempt = 0; attempt < 18; attempt++) {
@@ -201,9 +202,9 @@
     const available = new Set(cells.map(p => key(p.c, p.r)));
     const paths = [];
     let covered = 0;
-    const desiredCoverage = isBoss ? Math.min(.97, .93 + bossNumber * .005) : Math.min(.95, .76 + levelNumber * .004);
-    const maxPaths = isBoss ? Math.min(76, target + 4) : Math.min(68, target + 6);
-    const maxLen = isBoss ? Math.min(18, 14 + Math.floor(bossNumber / 2)) : Math.min(16, 7 + Math.floor(levelNumber / 6));
+    const desiredCoverage = isBoss ? Math.min(.98, .93 + bossNumber * .005) : Math.min(.95, .76 + levelNumber * .004);
+    const maxPaths = isBoss ? Math.min(80, target + 4) : Math.min(68, target + 6);
+    const maxLen = isBoss ? Math.min(20, 14 + Math.floor(bossNumber / 2)) : Math.min(16, 7 + Math.floor(levelNumber / 6));
     const minLen = isBoss ? 6 : Math.min(7, 3 + Math.floor(levelNumber / 12));
     const turnBias = isBoss ? 1 : Math.min(1, .55 + levelNumber * .015);
     let safety = 0;
@@ -355,13 +356,21 @@
     lives = 3; moves = 0; mistakes = 0; streak = 0; bestStreak = 0; score = 0;
     hintArrow = null; hintUntil = 0; particles = []; runningAnimation = false;
     level = makeLevel(Math.max(1, levelNumber), 0, Boolean(bossMode));
+    if (level.isBoss) {
+      lives = Math.max(1, 3 - Math.floor((level.bossNumber - 1) / 2));
+      hintsRemaining = Math.max(0, 3 - Math.floor((level.bossNumber + 1) / 2));
+    } else {
+      hintsRemaining = Infinity;
+    }
     els.game.classList.toggle('boss-level', level.isBoss);
     els.level.textContent = level.number;
-    els.shape.textContent = level.isBoss ? `BOSS ${level.bossNumber} • ${level.shape.name}` : level.shape.name;
+    const bossRank = level.bossNumber < 3 ? 'HARD' : level.bossNumber < 5 ? 'BRUTAL' : 'LEGENDARY';
+    els.shape.textContent = level.isBoss ? `BOSS ${level.bossNumber} • ${bossRank} • ${level.shape.name}` : level.shape.name;
+    updateHintButton();
     updateTestButton();
     updateHUD();
     resizeCanvas();
-    toast(level.isBoss ? 'Boss level • No skipping' : 'Find the loose arrow', level.isBoss ? 2100 : 1600);
+    toast(level.isBoss ? `${lives} ${lives === 1 ? 'life' : 'lives'} • No skipping` : 'Find the loose arrow', level.isBoss ? 2100 : 1600);
     sound('start');
   }
 
@@ -708,10 +717,38 @@
 
   function useHint() {
     if (state !== 'playing' || level.arrows.some(arrow => arrow.animation?.type === 'shake')) return;
+    if (level.isBoss && hintsRemaining <= 0) {
+      toast('No hints available for this boss', 1700);
+      sound('error');
+      haptic(18);
+      return;
+    }
     const safe = level.arrows.filter(a => !a.released && !a.animation && blockersFor(a).length === 0);
     if (!safe.length) return;
+    if (level.isBoss) {
+      hintsRemaining -= 1;
+      updateHintButton();
+    }
     hintArrow = safe[Math.floor(Math.random() * safe.length)]; hintUntil = performance.now() + 2500;
     toast('This arrow can escape', 1700); sound('hint'); haptic(8);
+  }
+
+  function updateHintButton() {
+    if (!level?.isBoss) {
+      els.hintTitle.textContent = 'Need a hint?';
+      els.hintDetail.textContent = 'Reveal a free arrow';
+      els.hint.classList.remove('depleted');
+      return;
+    }
+
+    if (hintsRemaining > 0) {
+      els.hintTitle.textContent = `${hintsRemaining} ${hintsRemaining === 1 ? 'hint' : 'hints'} left`;
+      els.hintDetail.textContent = 'Boss assistance';
+    } else {
+      els.hintTitle.textContent = 'No hints';
+      els.hintDetail.textContent = 'Boss rules';
+    }
+    els.hint.classList.toggle('depleted', hintsRemaining <= 0);
   }
 
   function cycleTheme() {

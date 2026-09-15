@@ -109,6 +109,7 @@ h1 span { color: var(--coral); font-style: italic; font-weight: 500; }
 .control-button { width: 58px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); background: transparent; font-size: 9px; font-weight: 750; }
 .control-button span { width: 46px; height: 46px; padding: 13px; border-radius: 17px; color: var(--ink); background: rgba(255,255,255,.62); border: 1px solid rgba(72,59,46,.08); box-shadow: 0 7px 18px rgba(51,41,31,.08); }
 .hint-button { width: 100%; min-width: 0; height: 58px; padding: 8px 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 20px; color: #fff; background: linear-gradient(145deg, #4f9289, #377770); box-shadow: 0 10px 22px rgba(48,111,104,.2); }
+.hint-button.depleted { color: rgba(255,255,255,.78); background: linear-gradient(145deg, #81786d, #645d55); box-shadow: 0 7px 16px rgba(50,44,39,.12); }
 .hint-icon { width: 35px; height: 35px; padding: 7px; border-radius: 13px; background: rgba(255,255,255,.13); }
 .hint-button strong, .hint-button small { display: block; text-align: left; }.hint-button strong { font-size: 11px; }.hint-button small { margin-top: 2px; opacity: .7; font-size: 8px; }
 
