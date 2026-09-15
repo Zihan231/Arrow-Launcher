@@ -15,7 +15,7 @@
     backdrop: $('#modalBackdrop'), pauseModal: $('#pauseModal'), settingsModal: $('#settingsModal'), successModal: $('#successModal'), failModal: $('#failModal'),
     resume: $('#resumeButton'), pauseRestart: $('#pauseRestartButton'), pauseHome: $('#pauseHomeButton'), menuSettings: $('#menuSettingsButton'), settingsClose: $('#settingsClose'),
     next: $('#nextButton'), retry: $('#retryButton'), failHome: $('#failHomeButton'), sound: $('#soundToggle'), haptic: $('#hapticToggle'), contrast: $('#contrastToggle'),
-    bossBadge: $('#bossBadge'), testNext: $('#testNextButton'), resultEyebrow: $('#resultEyebrow'), resultTitle: $('#resultTitle'), nextLabel: $('#nextLabel'),
+    bossBadge: $('#bossBadge'), resultEyebrow: $('#resultEyebrow'), resultTitle: $('#resultTitle'), nextLabel: $('#nextLabel'),
     resultScore: $('#resultScore'), resultMoves: $('#resultMoves'), resultMistakes: $('#resultMistakes'), resultStreak: $('#resultStreak'), confetti: $('#confetti')
   };
   const ctx = els.canvas.getContext('2d', { alpha: false });
@@ -396,7 +396,6 @@
     const bossRank = level.bossNumber < 3 ? 'HARD' : level.bossNumber < 5 ? 'BRUTAL' : 'LEGENDARY';
     els.shape.textContent = level.isBoss ? `BOSS ${level.bossNumber} • ${bossRank} • ${level.shape.name}` : level.shape.name;
     updateHintButton();
-    updateTestButton();
     updateHUD();
     resizeCanvas();
     toast(level.isBoss ? `${lives} ${lives === 1 ? 'life' : 'lives'} • No skipping` : 'Find the loose arrow', level.isBoss ? 2100 : 1600);
@@ -419,12 +418,7 @@
     updateMenu();
   }
 
-  function updateTestButton() {
-    if (!level) return;
-    if (level.isBoss) els.testNext.textContent = `TEST: LEVEL ${level.number + 10} →`;
-    else if (level.number % 10 === 0) els.testNext.textContent = `TEST: BOSS ${level.number / 10} →`;
-    else els.testNext.textContent = `TEST: LEVEL ${Math.ceil(level.number / 10) * 10} →`;
-  }
+
 
   function previewNextMilestone() {
     if (!level) return startGame(10, false, true);
@@ -1181,8 +1175,7 @@
   els.pauseHome.addEventListener('click', showMenu);
   els.retry.addEventListener('click', restartLevel);
   els.failHome.addEventListener('click', showMenu);
-  els.next.addEventListener('click', () => testingPreview ? previewNextMilestone() : startGame(save.level, save.bossPending));
-  els.testNext.addEventListener('click', previewNextMilestone);
+  els.next.addEventListener('click', () => startGame(save.level, save.bossPending));
   els.menuSettings.addEventListener('click', () => showModal(els.settingsModal));
   els.settingsClose.addEventListener('click', () => { closeModal(); state = els.menu.classList.contains('active') ? 'menu' : 'playing'; });
   els.sound.addEventListener('click', () => { save.sound = !save.sound; persist(); updateSettings(); sound('tap'); });
