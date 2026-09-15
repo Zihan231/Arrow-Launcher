@@ -66,6 +66,7 @@
       </div>
 
       <div class="canvas-shell" id="canvasShell">
+        <div class="boss-badge" id="bossBadge"><span>✦</span> BOSS</div>
         <canvas id="gameCanvas" aria-label="Arrow puzzle board"></canvas>
         <div class="board-toast" id="boardToast" role="status"></div>
       </div>
@@ -109,11 +110,11 @@
       <section class="modal result-modal" id="successModal" role="dialog" aria-modal="true" aria-label="Level complete">
         <div class="confetti" id="confetti"></div>
         <div class="modal-emblem success-emblem">✓</div>
-        <p class="eyebrow">ARTWORK UNTANGLED</p>
-        <h2>Beautifully done.</h2>
+        <p class="eyebrow" id="resultEyebrow">ARTWORK UNTANGLED</p>
+        <h2 id="resultTitle">Beautifully done.</h2>
         <div class="result-score"><span>SCORE</span><strong id="resultScore">1,000</strong></div>
         <div class="result-details"><span><small>Moves</small><b id="resultMoves">12</b></span><span><small>Mistakes</small><b id="resultMistakes">0</b></span><span><small>Best streak</small><b id="resultStreak">12</b></span></div>
-        <button class="modal-primary" id="nextButton">Next artwork <b>→</b></button>
+        <button class="modal-primary" id="nextButton"><span id="nextLabel">Next artwork</span> <b>→</b></button>
       </section>
 
       <section class="modal result-modal" id="failModal" role="dialog" aria-modal="true" aria-label="Out of lives">

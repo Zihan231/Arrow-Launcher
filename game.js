@@ -15,11 +15,12 @@
     backdrop: $('#modalBackdrop'), pauseModal: $('#pauseModal'), settingsModal: $('#settingsModal'), successModal: $('#successModal'), failModal: $('#failModal'),
     resume: $('#resumeButton'), pauseRestart: $('#pauseRestartButton'), pauseHome: $('#pauseHomeButton'), menuSettings: $('#menuSettingsButton'), settingsClose: $('#settingsClose'),
     next: $('#nextButton'), retry: $('#retryButton'), failHome: $('#failHomeButton'), sound: $('#soundToggle'), haptic: $('#hapticToggle'), contrast: $('#contrastToggle'),
+    bossBadge: $('#bossBadge'), resultEyebrow: $('#resultEyebrow'), resultTitle: $('#resultTitle'), nextLabel: $('#nextLabel'),
     resultScore: $('#resultScore'), resultMoves: $('#resultMoves'), resultMistakes: $('#resultMistakes'), resultStreak: $('#resultStreak'), confetti: $('#confetti')
   };
   const ctx = els.canvas.getContext('2d', { alpha: false });
 
-  const defaults = { level: 1, best: 1, cleared: 0, perfect: 0, sound: true, haptics: true, contrast: false, theme: 0 };
+  const defaults = { level: 1, best: 1, cleared: 0, perfect: 0, bosses: 0, bossPending: false, sound: true, haptics: true, contrast: false, theme: 0 };
   let save = loadSave();
   let state = 'menu';
   let level = null;
@@ -95,6 +96,34 @@
     }}
   ];
 
+  const inTriangle = (x, y, centerX, topY, baseY, halfWidth) =>
+    y >= topY && y <= baseY && Math.abs(x - centerX) <= ((y - topY) / (baseY - topY)) * halfWidth;
+
+  const bossSilhouettes = [
+    { name: 'CROWN OF PATHS', id: 'boss-crown', test: (x, y) => {
+      const crown = inTriangle(x, y, -.58, -.78, .18, .36) || inTriangle(x, y, 0, -.88, .18, .4) || inTriangle(x, y, .58, -.78, .18, .36);
+      const body = y >= .05 && y < .52 && Math.abs(x) < .86;
+      const base = y >= .48 && y < .7 && Math.abs(x) < .72;
+      return crown || body || base;
+    }},
+    { name: 'ROYAL SHIELD', id: 'boss-shield', test: (x, y) => {
+      if (y < -.78 || y > .82) return false;
+      const width = y < .05 ? .84 : .84 * Math.max(0, 1 - (y - .05) / .77);
+      return Math.abs(x) < width;
+    }},
+    { name: 'ETERNAL EYE', id: 'boss-eye', test: (x, y) => {
+      const outer = (x / .96) ** 2 + (y / .55) ** 2 < 1;
+      const rays = (Math.abs(x) < .13 && Math.abs(y) < .82) || (Math.abs(y) < .1 && Math.abs(x) < .94);
+      return outer || rays;
+    }},
+    { name: 'PHOENIX SEAL', id: 'boss-phoenix', test: (x, y) => {
+      const wings = ((Math.abs(x) - .48) / .48) ** 2 + ((y + .18) / .48) ** 2 < 1;
+      const body = Math.abs(x) < .14 && y > -.62 && y < .65;
+      const tail = y > .35 && Math.abs(x) < .52 * (1 - (y - .35) / .5);
+      return wings || body || tail;
+    }}
+  ];
+
   function loadSave() {
     try { return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') }; }
     catch (_) { return { ...defaults }; }
@@ -121,12 +150,13 @@
   const key = (c, r) => `${c},${r}`;
   const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
 
-  function makeLevel(levelNumber, generationSalt = 0) {
-    const random = mulberry32((levelNumber * 9277 + 43103 + generationSalt * 7919) >>> 0);
-    const shape = silhouettes[(levelNumber - 1) % silhouettes.length];
-    const cols = levelNumber < 12 ? 17 : levelNumber < 45 ? 19 : 21;
-    const rows = levelNumber < 12 ? 23 : levelNumber < 45 ? 25 : 27;
-    const gap = Math.min(14.5, 280 / (cols - 1), 372 / (rows - 1));
+  function makeLevel(levelNumber, generationSalt = 0, isBoss = false) {
+    const random = mulberry32((levelNumber * 9277 + 43103 + generationSalt * 7919 + (isBoss ? 104729 : 0)) >>> 0);
+    const bossNumber = isBoss ? levelNumber / 10 : 0;
+    const shape = isBoss ? bossSilhouettes[(bossNumber - 1) % bossSilhouettes.length] : silhouettes[(levelNumber - 1) % silhouettes.length];
+    const cols = isBoss ? 23 : levelNumber < 12 ? 17 : levelNumber < 45 ? 19 : 21;
+    const rows = isBoss ? 29 : levelNumber < 12 ? 23 : levelNumber < 45 ? 25 : 27;
+    const gap = isBoss ? Math.min(12.5, 280 / (cols - 1), 372 / (rows - 1)) : Math.min(14.5, 280 / (cols - 1), 372 / (rows - 1));
     const x0 = W / 2 - (cols - 1) * gap / 2;
     const y0 = H / 2 - (rows - 1) * gap / 2 - 5;
     const cells = [];
@@ -138,10 +168,10 @@
       }
     }
     const valid = new Set(cells.map(p => key(p.c, p.r)));
-    const target = Math.min(32, 11 + Math.floor(Math.sqrt(levelNumber) * 2.1) + Math.floor(levelNumber / 32));
+    const target = isBoss ? 36 : Math.min(32, 11 + Math.floor(Math.sqrt(levelNumber) * 2.1) + Math.floor(levelNumber / 32));
     let paths = [];
     for (let attempt = 0; attempt < 18; attempt++) {
-      paths = carvePaths(cells, valid, target, levelNumber, random);
+      paths = carvePaths(cells, valid, target, levelNumber, random, isBoss);
       if (paths.length >= Math.min(7, target - 1)) break;
     }
     const arrowObjects = paths.map((gridPoints, i) => ({
@@ -155,18 +185,18 @@
       order: -1
     }));
     if (!assignSolvableDirections(arrowObjects, random) && generationSalt < 80) {
-      return makeLevel(levelNumber, generationSalt + 1);
+      return makeLevel(levelNumber, generationSalt + 1, isBoss);
     }
-    return { number: levelNumber, shape, arrows: arrowObjects, total: arrowObjects.length, gap, cells, x0, y0, cols, rows };
+    return { number: levelNumber, isBoss, bossNumber, shape, arrows: arrowObjects, total: arrowObjects.length, gap, cells, x0, y0, cols, rows };
   }
 
-  function carvePaths(cells, valid, target, levelNumber, random) {
+  function carvePaths(cells, valid, target, levelNumber, random, isBoss = false) {
     const available = new Set(cells.map(p => key(p.c, p.r)));
     const paths = [];
     let covered = 0;
-    const desiredCoverage = levelNumber < 10 ? .7 : levelNumber < 35 ? .76 : .82;
-    const maxPaths = Math.min(40, target + 14);
-    const maxLen = Math.min(10, 6 + Math.floor(levelNumber / 28));
+    const desiredCoverage = isBoss ? .9 : levelNumber < 10 ? .7 : levelNumber < 35 ? .76 : .82;
+    const maxPaths = isBoss ? 48 : Math.min(40, target + 14);
+    const maxLen = isBoss ? 10 : Math.min(10, 6 + Math.floor(levelNumber / 28));
     let safety = 0;
     while ((paths.length < target || covered < cells.length * desiredCoverage) && paths.length < maxPaths && available.size > 2 && safety++ < 1100) {
       const candidates = shuffle(cells.filter(p => available.has(key(p.c, p.r))), random);
@@ -278,22 +308,23 @@
     );
   }
 
-  function startGame(levelNumber = save.level) {
+  function startGame(levelNumber = save.level, bossMode = save.bossPending) {
     closeModal();
     state = 'playing';
     showScreen(els.game);
     lives = 3; moves = 0; mistakes = 0; streak = 0; bestStreak = 0; score = 0;
     hintArrow = null; hintUntil = 0; particles = []; runningAnimation = false;
-    level = makeLevel(Math.max(1, levelNumber));
+    level = makeLevel(Math.max(1, levelNumber), 0, Boolean(bossMode));
+    els.game.classList.toggle('boss-level', level.isBoss);
     els.level.textContent = level.number;
-    els.shape.textContent = level.shape.name;
+    els.shape.textContent = level.isBoss ? `BOSS ${level.bossNumber} • ${level.shape.name}` : level.shape.name;
     updateHUD();
     resizeCanvas();
-    toast('Find the loose arrow', 1600);
+    toast(level.isBoss ? 'Boss level • No skipping' : 'Find the loose arrow', level.isBoss ? 2100 : 1600);
     sound('start');
   }
 
-  function restartLevel() { startGame(level ? level.number : save.level); }
+  function restartLevel() { startGame(level ? level.number : save.level, level ? level.isBoss : save.bossPending); }
   function showScreen(screen) {
     [els.menu, els.game].forEach(s => s.classList.toggle('active', s === screen));
   }
@@ -301,8 +332,9 @@
     state = 'menu'; closeModal(); showScreen(els.menu); updateMenu();
   }
   function updateMenu() {
-    els.menuLevel.textContent = `Level ${save.level}`;
-    els.playLabel.textContent = save.cleared ? 'CONTINUE' : 'BEGIN JOURNEY';
+    const bossWaiting = save.bossPending;
+    els.menuLevel.textContent = bossWaiting ? `Boss ${save.level / 10} • Level ${save.level}` : `Level ${save.level}`;
+    els.playLabel.textContent = bossWaiting ? 'FACE THE BOSS' : save.cleared ? 'CONTINUE' : 'BEGIN JOURNEY';
     els.best.textContent = save.best;
     els.cleared.textContent = save.cleared;
     els.perfect.textContent = save.perfect;
@@ -400,7 +432,7 @@
     }
 
     const theme = themes[save.theme];
-    const color = save.contrast ? '#11100f' : theme.ink[0];
+    const color = save.contrast ? '#11100f' : level?.isBoss ? '#4b3020' : theme.ink[0];
     const highlighted = arrow === hintArrow && now < hintUntil;
     if (arrow.animation?.type === 'release' && now - arrow.animation.lastTrail > 48) {
       const trailPoint = displayPoints[displayPoints.length - 1];
@@ -445,7 +477,7 @@
     const gridGap = level?.gap || 18;
     const gridOriginX = level ? ((level.x0 % gridGap) + gridGap) % gridGap : 18;
     const gridOriginY = level ? ((level.y0 % gridGap) + gridGap) % gridGap : 18;
-    ctx.fillStyle = save.contrast ? 'rgba(50,43,36,.29)' : 'rgba(72,61,50,.20)';
+    ctx.fillStyle = save.contrast ? 'rgba(50,43,36,.29)' : level?.isBoss ? 'rgba(139,91,26,.24)' : 'rgba(72,61,50,.20)';
     const dotRadius = save.contrast ? 1 : .86;
     for (let y = gridOriginY; y < H; y += gridGap) {
       for (let x = gridOriginX; x < W; x += gridGap) {
@@ -562,7 +594,7 @@
     updateHUD();
     if (level.arrows.every(a => a.released)) {
       runningAnimation = true;
-      score += 500 + (mistakes === 0 ? 500 : 0) + lives * 100;
+      score += (level.isBoss ? 3000 : 500) + (mistakes === 0 ? (level.isBoss ? 1200 : 500) : 0) + lives * 100;
       setTimeout(completeLevel, 480);
     }
   }
@@ -574,11 +606,25 @@
     els.resultMoves.textContent = moves;
     els.resultMistakes.textContent = mistakes;
     els.resultStreak.textContent = bestStreak;
+    els.resultEyebrow.textContent = level.isBoss ? 'BOSS CONQUERED' : 'ARTWORK UNTANGLED';
+    els.resultTitle.textContent = level.isBoss ? 'A magnificent victory.' : 'Beautifully done.';
     save.cleared++;
+    if (level.isBoss) {
+      save.bosses++;
+      save.bossPending = false;
+      save.level = level.number + 1;
+      els.nextLabel.textContent = 'Continue journey';
+    } else if (level.number % 10 === 0) {
+      save.bossPending = true;
+      save.level = level.number;
+      els.nextLabel.textContent = 'Face the boss';
+    } else {
+      save.level = level.number + 1;
+      els.nextLabel.textContent = 'Next artwork';
+    }
     if (!mistakes) save.perfect++;
-    save.level = level.number + 1;
     save.best = Math.max(save.best, save.level);
-    persist(); updateMenu(); makeConfetti();
+    persist(); updateMenu(); makeConfetti(level.isBoss ? 42 : 24);
     showModal(els.successModal);
   }
 
@@ -613,10 +659,10 @@
     toast(`${themes[save.theme].name} palette`, 1100); sound('tap');
   }
 
-  function makeConfetti() {
+  function makeConfetti(count = 24) {
     els.confetti.innerHTML = '';
     const colors = ['#e56c50', '#3f827b', '#d3a65e', '#8d6b8c'];
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < count; i++) {
       const bit = document.createElement('i');
       bit.style.left = `${5 + Math.random() * 90}%`;
       bit.style.background = colors[i % colors.length];
@@ -727,7 +773,7 @@
     els.app.classList.toggle('high-contrast', save.contrast);
   }
 
-  els.play.addEventListener('click', () => startGame(save.level));
+  els.play.addEventListener('click', () => startGame(save.level, save.bossPending));
   els.back.addEventListener('click', showMenu);
   els.pause.addEventListener('click', () => { if (state === 'playing') showModal(els.pauseModal); });
   els.restart.addEventListener('click', restartLevel);
@@ -738,7 +784,7 @@
   els.pauseHome.addEventListener('click', showMenu);
   els.retry.addEventListener('click', restartLevel);
   els.failHome.addEventListener('click', showMenu);
-  els.next.addEventListener('click', () => startGame(save.level));
+  els.next.addEventListener('click', () => startGame(save.level, save.bossPending));
   els.menuSettings.addEventListener('click', () => showModal(els.settingsModal));
   els.settingsClose.addEventListener('click', () => { closeModal(); state = els.menu.classList.contains('active') ? 'menu' : 'playing'; });
   els.sound.addEventListener('click', () => { save.sound = !save.sound; persist(); updateSettings(); sound('tap'); });
@@ -756,8 +802,8 @@
     if (event.key.toLowerCase() === 'r' && state === 'playing') restartLevel();
   });
 
-  function validateGenerated(number) {
-    const generated = makeLevel(number);
+  function validateGenerated(number, bossMode = false) {
+    const generated = makeLevel(number, 0, bossMode);
     const remaining = generated.arrows.slice();
     let removed = 0;
     while (remaining.length) {

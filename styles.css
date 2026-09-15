@@ -93,6 +93,13 @@ h1 span { color: var(--coral); font-style: italic; font-weight: 500; }
 .streak span { font-size: 12px; }.streak b { font-family: Georgia, serif; font-size: 14px; }
 .canvas-shell { position: relative; flex: 1 1 auto; min-height: 0; margin: 0 12px; overflow: hidden; border-radius: 28px; border: 1px solid rgba(73,61,48,.09); background: rgba(255,255,255,.33); box-shadow: inset 0 1px rgba(255,255,255,.7); }
 #gameCanvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.boss-badge { position: absolute; right: 15px; top: 14px; z-index: 3; display: none; align-items: center; gap: 5px; padding: 7px 11px; border: 1px solid rgba(159,108,31,.23); border-radius: 99px; color: #8b5c18; background: rgba(250,235,202,.86); box-shadow: 0 6px 16px rgba(117,76,19,.12); font-size: 8px; font-weight: 900; letter-spacing: .13em; }
+.boss-badge span { font-size: 10px; animation: boss-spark 1.4s ease-in-out infinite; }
+.game-screen.boss-level .boss-badge { display: flex; }
+.game-screen.boss-level .canvas-shell { border-color: rgba(174,119,34,.28); box-shadow: inset 0 1px rgba(255,255,255,.75), 0 0 0 3px rgba(211,166,94,.06); }
+.game-screen.boss-level .level-copy > span { color: #a76d1b; }
+.game-screen.boss-level .progress-track i { background: linear-gradient(90deg, #b17a29, #e0b663); }
+.game-screen.boss-level .progress-meta strong { color: #a76d1b; }
 .board-toast { position: absolute; left: 50%; top: 18px; z-index: 2; opacity: 0; transform: translate(-50%, -8px); padding: 8px 15px; border-radius: 20px; pointer-events: none; color: #fff; background: rgba(39,35,31,.88); font-size: 11px; font-weight: 700; transition: .22s ease; box-shadow: 0 8px 22px rgba(31,25,20,.16); white-space: nowrap; }
 .board-toast.show { opacity: 1; transform: translate(-50%, 0); }
 .game-controls { width: 100%; min-width: 0; overflow: hidden; flex: 0 0 98px; padding: 10px max(18px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); display: grid; grid-template-columns: 58px minmax(0, 1fr) 58px; gap: 9px; align-items: start; }
@@ -137,6 +144,7 @@ h1 span { color: var(--coral); font-style: italic; font-weight: 500; }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes modal-in { from { opacity: 0; transform: translateY(18px) scale(.96); } }
 @keyframes confetti-fall { to { transform: translate(var(--drift), 460px) rotate(620deg); opacity: 0; } }
+@keyframes boss-spark { 50% { transform: scale(1.3) rotate(18deg); filter: brightness(1.2); } }
 @media (min-width: 700px) {
   .app { width: 430px; height: min(900px, calc(100vh - 30px)); margin: 15px auto; border-radius: 38px; box-shadow: 0 30px 100px rgba(0,0,0,.45); }
 }
