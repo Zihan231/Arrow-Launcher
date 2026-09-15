@@ -36,6 +36,8 @@
   let hintArrow = null;
   let hintUntil = 0;
   let toastTimer = 0;
+  let holdingArrow = null;
+  let pointerState = null;
   let lastFrame = performance.now();
   let audioContext = null;
   let audioMaster = null;
@@ -381,6 +383,7 @@
     showScreen(els.game);
     lives = 3; moves = 0; mistakes = 0; streak = 0; bestStreak = 0; score = 0;
     hintArrow = null; hintUntil = 0; particles = []; runningAnimation = false;
+    clearHold();
     level = makeLevel(Math.max(1, levelNumber), 0, Boolean(bossMode));
     if (level.isBoss) {
       lives = Math.max(1, 3 - Math.floor((level.bossNumber - 1) / 2));
@@ -409,6 +412,7 @@
     completionTimer = 0;
     completionPending = false;
     testingPreview = false;
+    clearHold();
     closeModal();
     showScreen(els.menu);
     state = 'menu';
@@ -555,8 +559,15 @@
     }
 
     const theme = themes[save.theme];
-    const color = save.contrast ? '#11100f' : level?.isBoss ? '#4b3020' : theme.ink[0];
+    let color = save.contrast ? '#11100f' : level?.isBoss ? '#4b3020' : theme.ink[0];
     const highlighted = arrow === hintArrow && now < hintUntil;
+    const isHeld = arrow === holdingArrow && !arrow.released && !arrow.animation;
+
+    if (isHeld) {
+      const isBlocked = blockersFor(arrow).length > 0;
+      color = isBlocked ? '#dc2626' : '#16a34a';
+    }
+
     if (arrow.animation?.type === 'release' && now - arrow.animation.lastTrail > 48) {
       const trailPoint = displayPoints[displayPoints.length - 1];
       particles.push({
@@ -569,14 +580,26 @@
     }
     ctx.save();
     ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; ctx.miterLimit = 2;
-    if (highlighted) {
+    if (isHeld) {
+      const isBlocked = blockersFor(arrow).length > 0;
+      const glow = isBlocked ? '#ef4444' : '#22c55e';
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 8;
+      ctx.strokeStyle = glow;
+      ctx.lineWidth = save.contrast ? 6.5 : 5.5;
+      ctx.globalAlpha = 0.35;
+      routedPath(displayPoints, offset);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else if (highlighted) {
       ctx.shadowColor = theme.glow; ctx.shadowBlur = 8 + Math.sin(now / 110) * 3;
       ctx.strokeStyle = theme.glow; ctx.lineWidth = 6.5;
       ctx.globalAlpha = .2;
       routedPath(displayPoints, offset); ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    ctx.shadowColor = 'rgba(40,29,20,.13)'; ctx.shadowBlur = 1.5; ctx.shadowOffsetY = 1;
+    ctx.shadowColor = isHeld ? (blockersFor(arrow).length > 0 ? 'rgba(220,38,38,.4)' : 'rgba(22,163,74,.4)') : 'rgba(40,29,20,.13)';
+    ctx.shadowBlur = isHeld ? 3 : 1.5; ctx.shadowOffsetY = 1;
     ctx.strokeStyle = color; ctx.lineWidth = save.contrast ? 3.5 : 2.75;
     routedPath(displayPoints, offset); ctx.stroke();
 
@@ -666,9 +689,122 @@
       setupContext(); drawBackground(now);
       const active = level.arrows.filter(a => !a.released);
       active.sort((a, b) => a.points.length - b.points.length).forEach(a => drawArrow(a, now));
+      if (holdingArrow && !holdingArrow.released && !holdingArrow.animation) {
+        drawTrajectoryPreview(holdingArrow, now);
+      }
       drawParticles(now, dt);
     }
     requestAnimationFrame(frame);
+  }
+
+  function drawTrajectoryPreview(arrow, now) {
+    if (!arrow || arrow.released || arrow.animation) return;
+    const blockers = blockersFor(arrow);
+    const isBlocked = blockers.length > 0;
+    const head = arrow.points[arrow.points.length - 1];
+    const dir = arrow.direction;
+    const tip = { x: head.x + dir.x * 6.5, y: head.y + dir.y * 6.5 };
+
+    const strokeColor = isBlocked ? '#dc2626' : '#16a34a';
+    const glowColor = isBlocked ? 'rgba(220, 38, 38, 0.45)' : 'rgba(22, 163, 74, 0.45)';
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (isBlocked) {
+      const travel = collisionTravelDistance(arrow, blockers);
+      const target = {
+        x: head.x + dir.x * (travel + 6.5),
+        y: head.y + dir.y * (travel + 6.5)
+      };
+
+      // Subtle glow underlayer
+      ctx.shadowColor = strokeColor;
+      ctx.shadowBlur = 4;
+      ctx.strokeStyle = glowColor;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(tip.x, tip.y);
+      ctx.lineTo(target.x, target.y);
+      ctx.stroke();
+
+      // Sleek dashed beam
+      ctx.setLineDash([5, 3.5]);
+      ctx.lineDashOffset = -(now / 22) % 8.5;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.35;
+      ctx.beginPath();
+      ctx.moveTo(tip.x, tip.y);
+      ctx.lineTo(target.x, target.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const pulse = Math.sin(now / 90) * 1.2;
+      ctx.beginPath();
+      ctx.arc(target.x, target.y, 4 + pulse, 0, TAU);
+      ctx.fillStyle = 'rgba(220, 38, 38, 0.22)';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(target.x, target.y, 2.2, 0, TAU);
+      ctx.fillStyle = strokeColor;
+      ctx.fill();
+
+      const perp = { x: -dir.y, y: dir.x };
+      ctx.beginPath();
+      ctx.moveTo(target.x - perp.x * 3.5 - dir.x * 1.5, target.y - perp.y * 3.5 - dir.y * 1.5);
+      ctx.lineTo(target.x + perp.x * 3.5 + dir.x * 1.5, target.y + perp.y * 3.5 + dir.y * 1.5);
+      ctx.moveTo(target.x + perp.x * 3.5 - dir.x * 1.5, target.y + perp.y * 3.5 - dir.y * 1.5);
+      ctx.lineTo(target.x - perp.x * 3.5 + dir.x * 1.5, target.y - perp.y * 3.5 + dir.y * 1.5);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+    } else {
+      const edgeDistance = dir.x > 0 ? W - tip.x + 30 : dir.x < 0 ? tip.x + 30 : dir.y > 0 ? H - tip.y + 30 : tip.y + 30;
+      const target = {
+        x: tip.x + dir.x * edgeDistance,
+        y: tip.y + dir.y * edgeDistance
+      };
+
+      // Subtle glow underlayer
+      ctx.shadowColor = strokeColor;
+      ctx.shadowBlur = 4;
+      ctx.strokeStyle = glowColor;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(tip.x, tip.y);
+      ctx.lineTo(target.x, target.y);
+      ctx.stroke();
+
+      // Sleek dashed beam
+      ctx.setLineDash([6, 4]);
+      ctx.lineDashOffset = -(now / 18) % 10;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.35;
+      ctx.beginPath();
+      ctx.moveTo(tip.x, tip.y);
+      ctx.lineTo(target.x, target.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const length = Math.hypot(target.x - tip.x, target.y - tip.y);
+      const perp = { x: -dir.y, y: dir.x };
+      const step = 28;
+      const offsetPhase = (now / 20) % step;
+      for (let d = 16 + offsetPhase; d < length - 12; d += step) {
+        const cx = tip.x + dir.x * d;
+        const cy = tip.y + dir.y * d;
+        ctx.beginPath();
+        ctx.moveTo(cx - dir.x * 3 + perp.x * 2.8, cy - dir.y * 3 + perp.y * 2.8);
+        ctx.lineTo(cx + dir.x * 1.8, cy + dir.y * 1.8);
+        ctx.lineTo(cx - dir.x * 3 - perp.x * 2.8, cy - dir.y * 3 - perp.y * 2.8);
+        ctx.strokeStyle = 'rgba(22, 163, 74, 0.75)';
+        ctx.lineWidth = 1.25;
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
   }
 
   function pointSegmentDistance(p, a, b) {
@@ -689,7 +825,15 @@
     return best;
   }
 
-  function canvasPointer(event) {
+  function clearHold() {
+    if (pointerState) {
+      if (pointerState.timer) clearTimeout(pointerState.timer);
+      pointerState = null;
+    }
+    holdingArrow = null;
+  }
+
+  function canvasPointerDown(event) {
     if (state !== 'playing' || !level || lives <= 0 || level.arrows.some(arrow => arrow.animation?.type === 'collision')) return;
     const rect = els.canvas.getBoundingClientRect();
     const point = {
@@ -700,10 +844,44 @@
     const arrow = hitArrow(point);
     if (!arrow) return;
     event.preventDefault();
-    launchArrow(arrow);
+
+    clearHold();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const timer = setTimeout(() => {
+      if (pointerState && pointerState.arrow === arrow) {
+        pointerState.isHold = true;
+        holdingArrow = arrow;
+        haptic(12);
+      }
+    }, 200);
+
+    pointerState = { arrow, startX, startY, timer, isHold: false };
+  }
+
+  function canvasPointerMove(event) {
+    if (!pointerState) return;
+    const dist = Math.hypot(event.clientX - pointerState.startX, event.clientY - pointerState.startY);
+    if (dist > 18) {
+      clearHold();
+    }
+  }
+
+  function canvasPointerUp(event) {
+    if (!pointerState) return;
+    const { arrow, isHold } = pointerState;
+    clearHold();
+    if (!isHold && arrow) {
+      launchArrow(arrow);
+    }
+  }
+
+  function canvasPointerCancel() {
+    clearHold();
   }
 
   function launchArrow(arrow) {
+    clearHold();
     if (!arrow || arrow.released || arrow.animation) return;
     moves++;
     const blockers = blockersFor(arrow);
@@ -819,6 +997,7 @@
   }
 
   function showModal(modal) {
+    clearHold();
     pausedAt = performance.now();
     state = modal === els.settingsModal && els.menu.classList.contains('active') ? 'menu-modal' : 'paused';
     [els.pauseModal, els.settingsModal, els.successModal, els.failModal].forEach(m => m.classList.toggle('active', m === modal));
@@ -1009,7 +1188,10 @@
   els.sound.addEventListener('click', () => { save.sound = !save.sound; persist(); updateSettings(); sound('tap'); });
   els.haptic.addEventListener('click', () => { save.haptics = !save.haptics; persist(); updateSettings(); haptic(12); });
   els.contrast.addEventListener('click', () => { save.contrast = !save.contrast; persist(); updateSettings(); });
-  els.canvas.addEventListener('pointerdown', canvasPointer, { passive: false });
+  els.canvas.addEventListener('pointerdown', canvasPointerDown, { passive: false });
+  window.addEventListener('pointermove', canvasPointerMove, { passive: true });
+  window.addEventListener('pointerup', canvasPointerUp, { passive: true });
+  window.addEventListener('pointercancel', canvasPointerCancel, { passive: true });
   window.addEventListener('resize', resizeCanvas);
   if ('ResizeObserver' in window) new ResizeObserver(resizeCanvas).observe(els.shell);
   document.addEventListener('visibilitychange', () => {

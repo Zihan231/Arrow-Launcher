@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="100%" height="100%">
+  <defs>
+    <!-- Dotted background grid matching in-game canvas -->
+    <pattern id="dotGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="20" cy="20" r="1.5" fill="#4a3e33" fill-opacity="0.18"/>
+    </pattern>
+    <filter id="softShadow" x="-10%" y="-10%" width="125%" height="125%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#2a1f18" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <!-- Canvas Background -->
+  <rect width="800" height="800" fill="#f7f1e7"/>
+  <rect width="800" height="800" fill="url(#dotGrid)"/>
+
+  <!-- Logo Puzzle Artwork (ZERO overlapping paths - strict 40px grid) -->
+  <!-- Centered at (400, 290), shifted by -25 to balance the escaping arrow -->
+  <g transform="translate(375, 290)" filter="url(#softShadow)">
+
+    <!-- Arrow 1 (Lagoon Teal): Starts (-60, 100) -> (-60, 20) -> (20, 20) -> (20, -18) -->
+    <!-- Pointing UP: Blocked ahead by Arrow 2! -->
+    <path d="M -60 100 L -60 20 L 20 20 L 20 -15" 
+          fill="none" stroke="#2c5f59" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Teal Arrowhead pointing UP -->
+    <polygon points="6,-12 20,-38 34,-12" fill="#2c5f59"/>
+
+    <!-- Arrow 2 (Warm Terracotta): Starts (-60, -60) -> (60, -60) -> (60, 60) -> (-20, 60) -> (-20, 95) -->
+    <!-- Passes directly in front of Arrow 1, blocking it! Pointing DOWN -->
+    <path d="M -60 -60 L 60 -60 L 60 60 L -20 60 L -20 95" 
+          fill="none" stroke="#965239" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Terracotta Arrowhead pointing DOWN -->
+    <polygon points="-34,92 -20,118 -6,92" fill="#965239"/>
+
+    <!-- Arrow 3 (Hero Coral - ESCAPING): Wraps around the puzzle and launches free to the right! -->
+    <!-- Starts (-100, 100) -> (-100, -100) -> (100, -100) -> (100, 100) -> (145, 100) -->
+    <path d="M -100 100 L -100 -100 L 100 -100 L 100 100 L 142 100" 
+          fill="none" stroke="#e05a3e" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Coral Arrowhead pointing RIGHT (Clear exit path!) -->
+    <polygon points="138,86 166,100 138,114" fill="#e05a3e"/>
+
+    <!-- Escape trail dashes showing dynamic motion out of the maze -->
+    <line x1="178" y1="100" x2="196" y2="100" stroke="#e05a3e" stroke-width="4" stroke-linecap="round" stroke-dasharray="3 5"/>
+  </g>
+
+  <!-- Game Title Typography -->
+  <text x="400" y="560" text-anchor="middle" 
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Outfit', 'Inter', sans-serif" 
+        font-size="64" font-weight="900" letter-spacing="10" fill="#1c1815">
+    ARROW
+  </text>
+
+  <text x="400" y="616" text-anchor="middle" 
+        font-family="Georgia, 'Times New Roman', serif" 
+        font-size="28" font-weight="500" letter-spacing="14" fill="#885b46">
+    LAUNCHER
+  </text>
+
+  <!-- Editorial divider -->
+  <line x1="330" y1="658" x2="470" y2="658" stroke="#4a3e33" stroke-opacity="0.2" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="400" cy="658" r="3.5" fill="#e05a3e"/>
+</svg>

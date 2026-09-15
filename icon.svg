@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- App icon drop shadow -->
+    <filter id="iconShadow" x="-10%" y="-10%" width="125%" height="125%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#19130e" flood-opacity="0.22"/>
+    </filter>
+    <filter id="pathShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#2a1f18" flood-opacity="0.12"/>
+    </filter>
+
+    <!-- Linear gradient for icon background -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#faf6ef"/>
+      <stop offset="100%" stop-color="#eee5d7"/>
+    </linearGradient>
+
+    <!-- Clip path to squircle -->
+    <clipPath id="squircleClip">
+      <rect x="16" y="16" width="480" height="480" rx="108" ry="108"/>
+    </clipPath>
+
+    <!-- Dot pattern -->
+    <pattern id="iconDots" width="32" height="32" patternUnits="userSpaceOnUse">
+      <circle cx="16" cy="16" r="1.4" fill="#4a3e33" fill-opacity="0.18"/>
+    </pattern>
+  </defs>
+
+  <!-- Squircle Base with Soft Shadow -->
+  <rect x="16" y="16" width="480" height="480" rx="108" ry="108" fill="url(#bgGrad)" filter="url(#iconShadow)"/>
+
+  <!-- Masked Content (Dotted grid & puzzle border) -->
+  <g clip-path="url(#squircleClip)">
+    <rect x="16" y="16" width="480" height="480" fill="url(#iconDots)"/>
+
+    <!-- Subtle inner glass highlight -->
+    <rect x="16" y="16" width="480" height="480" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="3"/>
+    <!-- Subtle outer rim -->
+    <rect x="16" y="16" width="480" height="480" fill="none" stroke="rgba(73,61,48,0.12)" stroke-width="1.5"/>
+
+    <!-- Puzzle Icon Artwork (ZERO overlapping paths - strict in-game grid geometry) -->
+    <g transform="translate(230, 256) scale(1.18)" filter="url(#pathShadow)">
+
+      <!-- Arrow 1 (Lagoon Teal): Starts (-60, 100) -> (-60, 20) -> (20, 20) -> (20, -15) -->
+      <!-- Pointing UP: Blocked by Arrow 2 -->
+      <path d="M -60 100 L -60 20 L 20 20 L 20 -15" 
+            fill="none" stroke="#2c5f59" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+      <polygon points="7,-12 20,-36 33,-12" fill="#2c5f59"/>
+
+      <!-- Arrow 2 (Warm Terracotta): Starts (-60, -60) -> (60, -60) -> (60, 60) -> (-20, 60) -> (-20, 95) -->
+      <!-- Runs along y=-60, blocking Arrow 1! Points DOWN -->
+      <path d="M -60 -60 L 60 -60 L 60 60 L -20 60 L -20 95" 
+            fill="none" stroke="#965239" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+      <polygon points="-33,92 -20,116 -7,92" fill="#965239"/>
+
+      <!-- Arrow 3 (Hero Coral - ESCAPING): Encloses the maze and launches freely to the right -->
+      <path d="M -100 100 L -100 -100 L 100 -100 L 100 100 L 142 100" 
+            fill="none" stroke="#e05a3e" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+      <polygon points="138,87 164,100 138,113" fill="#e05a3e"/>
+
+      <!-- Launch motion escape ticks -->
+      <line x1="174" y1="100" x2="192" y2="100" stroke="#e05a3e" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="3 4"/>
+    </g>
+  </g>
+</svg>
