@@ -94,6 +94,9 @@ h1 span { color: var(--coral); font-style: italic; font-weight: 500; }
 .canvas-shell { position: relative; flex: 1 1 auto; min-height: 0; margin: 0 12px; overflow: hidden; border-radius: 28px; border: 1px solid rgba(73,61,48,.09); background: rgba(255,255,255,.33); box-shadow: inset 0 1px rgba(255,255,255,.7); }
 #gameCanvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .boss-badge { position: absolute; right: 15px; top: 14px; z-index: 3; display: none; align-items: center; gap: 5px; padding: 7px 11px; border: 1px solid rgba(159,108,31,.23); border-radius: 99px; color: #8b5c18; background: rgba(250,235,202,.86); box-shadow: 0 6px 16px rgba(117,76,19,.12); font-size: 8px; font-weight: 900; letter-spacing: .13em; }
+.test-next-button { position: absolute; left: 15px; top: 14px; z-index: 4; min-height: 29px; padding: 6px 10px; border: 1px dashed rgba(54,47,40,.2); border-radius: 99px; color: #6d645b; background: rgba(255,252,246,.88); box-shadow: 0 5px 13px rgba(48,39,30,.08); font-size: 7px; font-weight: 900; letter-spacing: .08em; }
+.test-next-button:active { transform: scale(.96); }
+.game-screen.boss-level .test-next-button { border-color: rgba(159,108,31,.28); color: #8b5c18; background: rgba(255,246,226,.9); }
 .boss-badge span { font-size: 10px; animation: boss-spark 1.4s ease-in-out infinite; }
 .game-screen.boss-level .boss-badge { display: flex; }
 .game-screen.boss-level .canvas-shell { border-color: rgba(174,119,34,.28); box-shadow: inset 0 1px rgba(255,255,255,.75), 0 0 0 3px rgba(211,166,94,.06); }

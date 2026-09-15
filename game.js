@@ -15,7 +15,7 @@
     backdrop: $('#modalBackdrop'), pauseModal: $('#pauseModal'), settingsModal: $('#settingsModal'), successModal: $('#successModal'), failModal: $('#failModal'),
     resume: $('#resumeButton'), pauseRestart: $('#pauseRestartButton'), pauseHome: $('#pauseHomeButton'), menuSettings: $('#menuSettingsButton'), settingsClose: $('#settingsClose'),
     next: $('#nextButton'), retry: $('#retryButton'), failHome: $('#failHomeButton'), sound: $('#soundToggle'), haptic: $('#hapticToggle'), contrast: $('#contrastToggle'),
-    bossBadge: $('#bossBadge'), resultEyebrow: $('#resultEyebrow'), resultTitle: $('#resultTitle'), nextLabel: $('#nextLabel'),
+    bossBadge: $('#bossBadge'), testNext: $('#testNextButton'), resultEyebrow: $('#resultEyebrow'), resultTitle: $('#resultTitle'), nextLabel: $('#nextLabel'),
     resultScore: $('#resultScore'), resultMoves: $('#resultMoves'), resultMistakes: $('#resultMistakes'), resultStreak: $('#resultStreak'), confetti: $('#confetti')
   };
   const ctx = els.canvas.getContext('2d', { alpha: false });
@@ -39,6 +39,7 @@
   let lastFrame = performance.now();
   let audioContext = null;
   let audioMaster = null;
+  let testingPreview = false;
 
   const themes = [
     { name: 'Terra', ink: ['#4a3427', '#80513b', '#326d68', '#bd624b', '#9b7139'], glow: '#e56c50' },
@@ -154,9 +155,12 @@
     const random = mulberry32((levelNumber * 9277 + 43103 + generationSalt * 7919 + (isBoss ? 104729 : 0)) >>> 0);
     const bossNumber = isBoss ? levelNumber / 10 : 0;
     const shape = isBoss ? bossSilhouettes[(bossNumber - 1) % bossSilhouettes.length] : silhouettes[(levelNumber - 1) % silhouettes.length];
-    const cols = isBoss ? 23 : levelNumber < 12 ? 17 : levelNumber < 45 ? 19 : 21;
-    const rows = isBoss ? 29 : levelNumber < 12 ? 23 : levelNumber < 45 ? 25 : 27;
-    const gap = isBoss ? Math.min(12.5, 280 / (cols - 1), 372 / (rows - 1)) : Math.min(14.5, 280 / (cols - 1), 372 / (rows - 1));
+    const normalGrowth = Math.min(4, Math.floor((levelNumber - 1) / 10));
+    const bossGrowth = isBoss ? Math.min(2, Math.floor((bossNumber - 1) / 3)) : 0;
+    const cols = isBoss ? 27 + bossGrowth * 2 : 21 + normalGrowth * 2;
+    const rows = isBoss ? 33 + bossGrowth * 2 : 27 + normalGrowth * 2;
+    const bossGap = 11.5 - Math.min(1.2, Math.max(0, bossNumber - 1) * .1);
+    const gap = isBoss ? Math.min(bossGap, 280 / (cols - 1), 372 / (rows - 1)) : Math.min(13.5, 280 / (cols - 1), 372 / (rows - 1));
     const x0 = W / 2 - (cols - 1) * gap / 2;
     const y0 = H / 2 - (rows - 1) * gap / 2 - 5;
     const cells = [];
@@ -168,10 +172,12 @@
       }
     }
     const valid = new Set(cells.map(p => key(p.c, p.r)));
-    const target = isBoss ? 36 : Math.min(32, 11 + Math.floor(Math.sqrt(levelNumber) * 2.1) + Math.floor(levelNumber / 32));
+    const target = isBoss
+      ? Math.min(72, 56 + bossNumber * 2)
+      : Math.min(64, 24 + Math.floor(levelNumber * .8));
     let paths = [];
     for (let attempt = 0; attempt < 18; attempt++) {
-      paths = carvePaths(cells, valid, target, levelNumber, random, isBoss);
+      paths = carvePaths(cells, valid, target, levelNumber, random, isBoss, bossNumber);
       if (paths.length >= Math.min(7, target - 1)) break;
     }
     const arrowObjects = paths.map((gridPoints, i) => ({
@@ -184,25 +190,33 @@
       colorIndex: (i + Math.floor(random() * 3)) % themes[save.theme].ink.length,
       order: -1
     }));
-    if (!assignSolvableDirections(arrowObjects, random) && generationSalt < 80) {
+    const dependencyBias = isBoss ? Math.min(1, .94 + bossNumber * .015) : Math.min(.98, .45 + levelNumber * .02);
+    if (!assignSolvableDirections(arrowObjects, random, dependencyBias) && generationSalt < 80) {
       return makeLevel(levelNumber, generationSalt + 1, isBoss);
     }
     return { number: levelNumber, isBoss, bossNumber, shape, arrows: arrowObjects, total: arrowObjects.length, gap, cells, x0, y0, cols, rows };
   }
 
-  function carvePaths(cells, valid, target, levelNumber, random, isBoss = false) {
+  function carvePaths(cells, valid, target, levelNumber, random, isBoss = false, bossNumber = 0) {
     const available = new Set(cells.map(p => key(p.c, p.r)));
     const paths = [];
     let covered = 0;
-    const desiredCoverage = isBoss ? .9 : levelNumber < 10 ? .7 : levelNumber < 35 ? .76 : .82;
-    const maxPaths = isBoss ? 48 : Math.min(40, target + 14);
-    const maxLen = isBoss ? 10 : Math.min(10, 6 + Math.floor(levelNumber / 28));
+    const desiredCoverage = isBoss ? Math.min(.97, .93 + bossNumber * .005) : Math.min(.95, .76 + levelNumber * .004);
+    const maxPaths = isBoss ? Math.min(76, target + 4) : Math.min(68, target + 6);
+    const maxLen = isBoss ? Math.min(18, 14 + Math.floor(bossNumber / 2)) : Math.min(16, 7 + Math.floor(levelNumber / 6));
+    const minLen = isBoss ? 6 : Math.min(7, 3 + Math.floor(levelNumber / 12));
+    const turnBias = isBoss ? 1 : Math.min(1, .55 + levelNumber * .015);
     let safety = 0;
-    while ((paths.length < target || covered < cells.length * desiredCoverage) && paths.length < maxPaths && available.size > 2 && safety++ < 1100) {
-      const candidates = shuffle(cells.filter(p => available.has(key(p.c, p.r))), random);
+    while ((paths.length < target || covered < cells.length * desiredCoverage) && paths.length < maxPaths && available.size > 2 && safety++ < 1800) {
+      const candidates = shuffle(cells.filter(p => available.has(key(p.c, p.r))), random)
+        .map(point => ({
+          ...point,
+          freedom: dirs.reduce((count, direction) => count + (available.has(key(point.c + direction.x, point.r + direction.y)) ? 1 : 0), 0)
+        }))
+        .sort((a, b) => b.freedom - a.freedom);
       if (!candidates.length) break;
       const start = candidates[0];
-      const wanted = 2 + Math.floor(random() * Math.max(2, maxLen - 1));
+      const wanted = minLen + Math.floor(random() * Math.max(1, maxLen - minLen + 1));
       const path = [start];
       const local = new Set([key(start.c, start.r)]);
       let current = start;
@@ -215,11 +229,15 @@
             return neighborKey !== key(current.c, current.r) && local.has(neighborKey);
           }));
         if (!options.length) break;
-        options = shuffle(options, random).sort((a, b) => {
-          const aTurn = previousDir && (a.d.x !== previousDir.x || a.d.y !== previousDir.y) ? 1 : 0;
-          const bTurn = previousDir && (b.d.x !== previousDir.x || b.d.y !== previousDir.y) ? 1 : 0;
-          return (bTurn - aTurn) * (random() > .34 ? 1 : -1);
+        options.forEach(option => {
+          const isTurn = previousDir && (option.d.x !== previousDir.x || option.d.y !== previousDir.y);
+          const onward = dirs.reduce((count, direction) => {
+            const nextKey = key(option.c + direction.x, option.r + direction.y);
+            return count + (available.has(nextKey) && !local.has(nextKey) ? 1 : 0);
+          }, 0);
+          option.score = onward * 1.05 + (isTurn ? 2.2 + turnBias * 2.6 : 0) + random() * .7;
         });
+        options.sort((a, b) => b.score - a.score);
         const next = options[0];
         path.push({ c: next.c, r: next.r });
         local.add(key(next.c, next.r));
@@ -233,6 +251,19 @@
       } else {
         available.delete(key(start.c, start.r));
       }
+    }
+    // Shape topology can occasionally consume the available cells in fewer
+    // long routes than the level's arrow target. Split only the longest routes
+    // so later levels still meet their minimum arrow-count difficulty.
+    while (paths.length < Math.min(target, maxPaths)) {
+      let longestIndex = -1;
+      for (let i = 0; i < paths.length; i++) {
+        if (paths[i].length >= 4 && (longestIndex < 0 || paths[i].length > paths[longestIndex].length)) longestIndex = i;
+      }
+      if (longestIndex < 0) break;
+      const longest = paths[longestIndex];
+      const middle = Math.floor(longest.length / 2);
+      paths.splice(longestIndex, 1, longest.slice(0, middle), longest.slice(middle));
     }
     return paths;
   }
@@ -272,8 +303,9 @@
     );
   }
 
-  function assignSolvableDirections(arrows, random) {
+  function assignSolvableDirections(arrows, random, dependencyBias = .25) {
     const remaining = arrows.slice();
+    const solvedEarlier = [];
     let order = 0;
     while (remaining.length) {
       const safeOptions = [];
@@ -289,16 +321,23 @@
           // from the body by a tiny artificial elbow.
           if (blocksMoving(candidate, ownBody, direction)) continue;
           if (!remaining.some(other => other !== arrow && blocksMoving(candidate, other, direction))) {
-            safeOptions.push({ arrow, direction, points: oriented });
+            const blockerScore = solvedEarlier.reduce((count, earlier) => count + (blocksMoving(candidate, earlier, direction) ? 1 : 0), 0);
+            safeOptions.push({ arrow, direction, points: oriented, blockerScore });
           }
         }
       }
       if (!safeOptions.length) return false;
-      const chosen = safeOptions[Math.floor(random() * safeOptions.length)];
+      let choices = safeOptions;
+      if (random() < dependencyBias) {
+        const strongestDependency = Math.max(...safeOptions.map(option => option.blockerScore));
+        choices = safeOptions.filter(option => option.blockerScore === strongestDependency);
+      }
+      const chosen = choices[Math.floor(random() * choices.length)];
       chosen.arrow.points = chosen.points;
       chosen.arrow._samples = null;
       chosen.arrow.direction = { ...chosen.direction };
       chosen.arrow.order = order++;
+      solvedEarlier.push(chosen.arrow);
       remaining.splice(remaining.indexOf(chosen.arrow), 1);
     }
     arrows.forEach(arrow => { arrow._samples = null; });
@@ -308,8 +347,9 @@
     );
   }
 
-  function startGame(levelNumber = save.level, bossMode = save.bossPending) {
+  function startGame(levelNumber = save.level, bossMode = save.bossPending, previewMode = false) {
     closeModal();
+    testingPreview = previewMode;
     state = 'playing';
     showScreen(els.game);
     lives = 3; moves = 0; mistakes = 0; streak = 0; bestStreak = 0; score = 0;
@@ -318,18 +358,33 @@
     els.game.classList.toggle('boss-level', level.isBoss);
     els.level.textContent = level.number;
     els.shape.textContent = level.isBoss ? `BOSS ${level.bossNumber} • ${level.shape.name}` : level.shape.name;
+    updateTestButton();
     updateHUD();
     resizeCanvas();
     toast(level.isBoss ? 'Boss level • No skipping' : 'Find the loose arrow', level.isBoss ? 2100 : 1600);
     sound('start');
   }
 
-  function restartLevel() { startGame(level ? level.number : save.level, level ? level.isBoss : save.bossPending); }
+  function restartLevel() { startGame(level ? level.number : save.level, level ? level.isBoss : save.bossPending, testingPreview); }
   function showScreen(screen) {
     [els.menu, els.game].forEach(s => s.classList.toggle('active', s === screen));
   }
   function showMenu() {
-    state = 'menu'; closeModal(); showScreen(els.menu); updateMenu();
+    state = 'menu'; testingPreview = false; closeModal(); showScreen(els.menu); updateMenu();
+  }
+
+  function updateTestButton() {
+    if (!level) return;
+    if (level.isBoss) els.testNext.textContent = `TEST: LEVEL ${level.number + 10} →`;
+    else if (level.number % 10 === 0) els.testNext.textContent = `TEST: BOSS ${level.number / 10} →`;
+    else els.testNext.textContent = `TEST: LEVEL ${Math.ceil(level.number / 10) * 10} →`;
+  }
+
+  function previewNextMilestone() {
+    if (!level) return startGame(10, false, true);
+    if (level.isBoss) startGame(level.number + 10, false, true);
+    else if (level.number % 10 === 0) startGame(level.number, true, true);
+    else startGame(Math.ceil(level.number / 10) * 10, false, true);
   }
   function updateMenu() {
     const bossWaiting = save.bossPending;
@@ -608,6 +663,12 @@
     els.resultStreak.textContent = bestStreak;
     els.resultEyebrow.textContent = level.isBoss ? 'BOSS CONQUERED' : 'ARTWORK UNTANGLED';
     els.resultTitle.textContent = level.isBoss ? 'A magnificent victory.' : 'Beautifully done.';
+    if (testingPreview) {
+      els.nextLabel.textContent = 'Next test level';
+      makeConfetti(level.isBoss ? 42 : 24);
+      showModal(els.successModal);
+      return;
+    }
     save.cleared++;
     if (level.isBoss) {
       save.bosses++;
@@ -784,7 +845,8 @@
   els.pauseHome.addEventListener('click', showMenu);
   els.retry.addEventListener('click', restartLevel);
   els.failHome.addEventListener('click', showMenu);
-  els.next.addEventListener('click', () => startGame(save.level, save.bossPending));
+  els.next.addEventListener('click', () => testingPreview ? previewNextMilestone() : startGame(save.level, save.bossPending));
+  els.testNext.addEventListener('click', previewNextMilestone);
   els.menuSettings.addEventListener('click', () => showModal(els.settingsModal));
   els.settingsClose.addEventListener('click', () => { closeModal(); state = els.menu.classList.contains('active') ? 'menu' : 'playing'; });
   els.sound.addEventListener('click', () => { save.sound = !save.sound; persist(); updateSettings(); sound('tap'); });

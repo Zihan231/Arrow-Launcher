@@ -16,6 +16,10 @@ Tap a curved arrow to launch its entire path in the direction of its head. If an
 
 Every ten normal levels unlock a separate mandatory Boss Level with an exclusive silhouette, maximum path complexity, tighter spacing, and denser coverage. The next normal level remains locked until its boss is defeated.
 
+Difficulty rises continuously through higher arrow-count targets, denser silhouette coverage, longer paths, more turns, tighter grids, and deeper removal dependencies. Boss difficulty also scales with the boss number.
+
+The in-game `TEST` button previews milestone content in this order: Level 10 → Boss 1 → Level 20 → Boss 2, continuing indefinitely. Test previews never modify saved progression.
+
 Progress, settings, best level, completions, and perfect clears are saved in `localStorage`.
 
 ## Controls
