@@ -236,7 +236,9 @@
   }
 
   function blockersFor(arrow, arrows = level.arrows, direction = arrow.direction) {
-    return arrows.filter(other => !other.released && other !== arrow && blocksMoving(arrow, other, direction));
+    return arrows.filter(other =>
+      !other.released && other.animation?.type !== 'release' && other !== arrow && blocksMoving(arrow, other, direction)
+    );
   }
 
   function assignSolvableDirections(arrows, random) {
@@ -512,7 +514,7 @@
   }
 
   function canvasPointer(event) {
-    if (state !== 'playing' || runningAnimation || !level) return;
+    if (state !== 'playing' || !level || lives <= 0 || level.arrows.some(arrow => arrow.animation?.type === 'shake')) return;
     const rect = els.canvas.getBoundingClientRect();
     const point = { x: (event.clientX - rect.left) / rect.width * W, y: (event.clientY - rect.top) / rect.height * H };
     const arrow = hitArrow(point);
@@ -522,6 +524,7 @@
   }
 
   function launchArrow(arrow) {
+    if (!arrow || arrow.released || arrow.animation) return;
     moves++;
     const blockers = blockersFor(arrow);
     if (!blockers.length) {
@@ -598,8 +601,8 @@
   }
 
   function useHint() {
-    if (state !== 'playing' || runningAnimation) return;
-    const safe = level.arrows.filter(a => !a.released && blockersFor(a).length === 0);
+    if (state !== 'playing' || level.arrows.some(arrow => arrow.animation?.type === 'shake')) return;
+    const safe = level.arrows.filter(a => !a.released && !a.animation && blockersFor(a).length === 0);
     if (!safe.length) return;
     hintArrow = safe[Math.floor(Math.random() * safe.length)]; hintUntil = performance.now() + 2500;
     toast('This arrow can escape', 1700); sound('hint'); haptic(8);
