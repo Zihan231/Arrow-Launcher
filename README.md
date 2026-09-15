@@ -1,34 +1,57 @@
 # Arrow Launcher
 
-A mobile-first, endless Canvas puzzle game built with HTML, CSS, and vanilla JavaScript.
+A relaxing, mobile-first endless puzzle game built with pure HTML5 Canvas, Vanilla CSS, and JavaScript. Zero external runtime dependencies.
 
-The interface adapts across small phones, landscape devices, tablets, laptops, and large desktop displays. Wide screens use dedicated information and control rails while the puzzle canvas keeps its original proportions.
+The interface seamlessly adapts across mobile phones, tablets, landscape screens, and desktop displays with responsive glassmorphic UI rails while preserving the puzzle board's aspect ratio.
 
-## Run
+---
 
-Open `index.html` directly, or serve the folder with any static web server:
+## 🚀 Quick Start
+
+Open `index.html` directly in any modern browser, or launch with any local static server:
 
 ```sh
 npx serve .
 ```
 
-## Gameplay
+---
 
-Tap a curved arrow to launch its entire path in the direction of its head. If another path blocks its travel lane, the arrow follows its own bends up to the blocker, visibly crashes, and rewinds along the same path to its original position while one life is lost. Remove every arrow to reveal the next procedural artwork.
+## 📁 Source Code Architecture
 
-Every ten normal levels unlock a separate mandatory Boss Level with an exclusive silhouette, maximum path complexity, tighter spacing, and denser coverage. The next normal level remains locked until its boss is defeated.
+| File | Type | Description |
+| :--- | :--- | :--- |
+| **[`index.html`](file:///c:/My%20projects/Games/Arrow-Launcher/index.html)** | Structure | Semantic HTML5 markup, screen layouts (Menu & Game HUD), modals (Tutorial Lesson, Pause, Settings, Victory, Defeat), and SVG icons. |
+| **[`game.js`](file:///c:/My%20projects/Games/Arrow-Launcher/game.js)** | Logic | Complete game engine: procedural silhouette maze carving, dependency graph solver, physics simulation, hold-to-preview trajectory helper, Web Audio API sound synthesizers, input manager, and `localStorage` persistence. |
+| **[`styles.css`](file:///c:/My%20projects/Games/Arrow-Launcher/styles.css)** | Styling | Custom design system: CSS variables, warm parchment textures, glassmorphism, responsive breakpoints, animations, and high-contrast accessibility mode. |
+| **[`icon.svg`](file:///c:/My%20projects/Games/Arrow-Launcher/icon.svg)** | Asset | 512×512 authentic non-overlapping vector app icon and browser favicon. |
+| **[`logo.svg`](file:///c:/My%20projects/Games/Arrow-Launcher/logo.svg)** | Asset | Scalable non-overlapping branding logo with editorial typography. |
 
-Difficulty rises continuously through higher arrow-count targets, denser silhouette coverage, longer paths, more turns, tighter grids, and deeper removal dependencies. Normal arrows can grow to 30 grid points, while boss arrows can reach 45. Boss difficulty also scales with the boss number: later bosses target up to 76 arrows, while lives fall from three to one and hints fall from two to none.
+---
 
-The in-game `TEST` button previews milestone content in this order: Level 10 → Boss 1 → Level 20 → Boss 2, continuing indefinitely. Test previews never modify saved progression.
+## 🎮 Gameplay & Rules
 
-Progress, settings, best level, completions, and perfect clears are saved in `localStorage`.
+- **Tap to Launch**: Tap an unblocked arrow to launch its entire path forward off the board.
+- **Collisions**: If an arrow strikes another path, it rebounds to its starting position and costs one life (heart ♥).
+- **Hold to Preview (Trajectory Helper)**:
+  - **Press & Hold (>= 200ms)** on any arrow to project its forward path.
+  - **Red Beam**: Indicates the path collides with an obstacle arrow.
+  - **Green Beam**: Indicates a safe escape route off the board.
+  - **Release**: Cancels the preview without launching the arrow.
+- **Boss Levels**: Every 10th level unlocks a mandatory Boss Art piece with maximum path complexity, tighter grids, and higher dependency depth.
+- **Interactive Lesson**: First-time players land on a quick visual lesson followed by a hands-on **4-move practice level** before advancing to Level 1.
 
-## Controls
+---
 
-- Tap/click an arrow: launch
-- `H`: hint
-- `R`: restart
-- `Esc`: pause/resume
+## ⌨️ Controls
 
-All artwork and puzzle geometry are procedurally drawn on the Canvas; there are no external runtime assets or dependencies.
+- **Tap / Click**: Launch arrow (quick tap)
+- **Hold (Touch/Mouse)**: Trajectory preview helper (Green = Safe, Red = Blocked)
+- **H**: Use hint (highlights a free arrow)
+- **R**: Restart current level
+- **Esc**: Pause / resume game
+
+---
+
+## 💾 Progress & Persistence
+
+All player data (highest level, cleared count, perfect completions, settings, sound toggles, and lesson progress) is saved locally in `localStorage`.
