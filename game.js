@@ -41,6 +41,10 @@
   let audioMaster = null;
   let testingPreview = false;
   let hintsRemaining = Infinity;
+  let completionPending = false;
+  let completionCommitted = false;
+  let completionPresented = false;
+  let completionTimer = 0;
 
   const themes = [
     { name: 'Terra', ink: ['#4a3427', '#80513b', '#326d68', '#bd624b', '#9b7139'], glow: '#e56c50' },
@@ -349,6 +353,11 @@
   }
 
   function startGame(levelNumber = save.level, bossMode = save.bossPending, previewMode = false) {
+    clearTimeout(completionTimer);
+    completionTimer = 0;
+    completionPending = false;
+    completionCommitted = false;
+    completionPresented = false;
     closeModal();
     testingPreview = previewMode;
     state = 'playing';
@@ -379,7 +388,14 @@
     [els.menu, els.game].forEach(s => s.classList.toggle('active', s === screen));
   }
   function showMenu() {
-    state = 'menu'; testingPreview = false; closeModal(); showScreen(els.menu); updateMenu();
+    clearTimeout(completionTimer);
+    completionTimer = 0;
+    completionPending = false;
+    testingPreview = false;
+    closeModal();
+    showScreen(els.menu);
+    state = 'menu';
+    updateMenu();
   }
 
   function updateTestButton() {
@@ -669,25 +685,15 @@
     if (level.arrows.every(a => a.released)) {
       runningAnimation = true;
       score += (level.isBoss ? 3000 : 500) + (mistakes === 0 ? (level.isBoss ? 1200 : 500) : 0) + lives * 100;
-      setTimeout(completeLevel, 480);
+      completionPending = true;
+      commitLevelCompletion();
+      completionTimer = setTimeout(completeLevel, 480);
     }
   }
 
-  function completeLevel() {
-    if (state !== 'playing') return;
-    sound('complete'); haptic([18, 40, 18, 40, 45]);
-    els.resultScore.textContent = score.toLocaleString();
-    els.resultMoves.textContent = moves;
-    els.resultMistakes.textContent = mistakes;
-    els.resultStreak.textContent = bestStreak;
-    els.resultEyebrow.textContent = level.isBoss ? 'BOSS CONQUERED' : 'ARTWORK UNTANGLED';
-    els.resultTitle.textContent = level.isBoss ? 'A magnificent victory.' : 'Beautifully done.';
-    if (testingPreview) {
-      els.nextLabel.textContent = 'Next test level';
-      makeConfetti(level.isBoss ? 42 : 24);
-      showModal(els.successModal);
-      return;
-    }
+  function commitLevelCompletion() {
+    if (completionCommitted || testingPreview) return;
+    completionCommitted = true;
     save.cleared++;
     if (level.isBoss) {
       save.bosses++;
@@ -704,7 +710,31 @@
     }
     if (!mistakes) save.perfect++;
     save.best = Math.max(save.best, save.level);
-    persist(); updateMenu(); makeConfetti(level.isBoss ? 42 : 24);
+    persist();
+    updateMenu();
+  }
+
+  function completeLevel() {
+    if (completionPresented || !level || !level.arrows.every(arrow => arrow.released)) return;
+    completionPresented = true;
+    completionPending = false;
+    clearTimeout(completionTimer);
+    completionTimer = 0;
+    sound('complete'); haptic([18, 40, 18, 40, 45]);
+    els.resultScore.textContent = score.toLocaleString();
+    els.resultMoves.textContent = moves;
+    els.resultMistakes.textContent = mistakes;
+    els.resultStreak.textContent = bestStreak;
+    els.resultEyebrow.textContent = level.isBoss ? 'BOSS CONQUERED' : 'ARTWORK UNTANGLED';
+    els.resultTitle.textContent = level.isBoss ? 'A magnificent victory.' : 'Beautifully done.';
+    if (testingPreview) {
+      els.nextLabel.textContent = 'Next test level';
+      makeConfetti(level.isBoss ? 42 : 24);
+      showModal(els.successModal);
+      return;
+    }
+    commitLevelCompletion();
+    makeConfetti(level.isBoss ? 42 : 24);
     showModal(els.successModal);
   }
 
@@ -902,7 +932,10 @@
   els.canvas.addEventListener('pointerdown', canvasPointer, { passive: false });
   window.addEventListener('resize', resizeCanvas);
   if ('ResizeObserver' in window) new ResizeObserver(resizeCanvas).observe(els.shell);
-  document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') showModal(els.pauseModal); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && state === 'playing' && !completionPending) showModal(els.pauseModal);
+    else if (!document.hidden && completionPending) completeLevel();
+  });
   window.addEventListener('keydown', event => {
     if (event.key === 'Escape') {
       if (els.backdrop.classList.contains('show')) closeModal();
